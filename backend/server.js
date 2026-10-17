@@ -120,19 +120,22 @@ app.use((err, req, res, next) => {
 // 7. START SERVER AFTER DATABASE CONNECTION
 // --------------------------------------------------
 
-const startServer = async () => {
-  try {
-    await connectDB();
+export default app;
 
-    app.listen(PORT, () => {
-      console.log(`CCTEK backend running on port ${PORT}`);
-      console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
-      console.log(`Allowed frontend origins: ${allowedOrigins.join(", ")}`);
-    });
-  } catch (error) {
-    console.error("Failed to start CCTEK backend:", error.message);
-    process.exit(1);
-  }
-};
+if (process.env.NODE_ENV !== "production") {
+  const startServer = async () => {
+    try {
+      await connectDB();
 
-startServer();
+      app.listen(PORT, () => {
+        console.log(`CCTEK backend running on port ${PORT}`);
+      });
+    } catch (error) {
+      console.error("Failed to start CCTEK backend:", error);
+      process.exit(1);
+    }
+  };
+
+  startServer();
+}
+
