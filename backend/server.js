@@ -1,20 +1,75 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { clerkMiddleware } from "@clerk/express";
 import mongoose from "mongoose";
 import connectDB from "./src/config/db.js";
 
+import accountRoutes from "./src/routes/accountRoutes.js";
+import projectRoutes from "./src/routes/projectRoutes.js";
+import { errorHandler, notFound } from "./src/middlewares/errorHandler.js";
+
 dotenv.config();
+
+// Reject queries like { email: { $ne: null } } built from request input
+// (NoSQL injection), and ignore unknown filter fields.
+mongoose.set("sanitizeFilter", true);
+mongoose.set("strictQuery", true);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Behind Vercel / a reverse proxy: needed for correct client IPs in the
+// rate limiter and audit log.
+app.set("trust proxy", 1);
+app.disable("x-powered-by");
+
+// --------------------------------------------------
+// 0. SECURITY HEADERS + RATE LIMITS
+// --------------------------------------------------
+
+// JSON API only: deny framing, sniffing, referrers; strict HTTPS.
+app.use(
+  helmet({
+    contentSecurityPolicy: { directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } },
+    crossOriginResourcePolicy: { policy: "same-site" },
+    referrerPolicy: { policy: "no-referrer" },
+  })
+);
+
+app.use(
+  "/api",
+  rateLimit({
+    windowMs: 60 * 1000,
+    limit: 300, // per IP per minute: generous for office use, stops scripted abuse
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    message: { success: false, message: "Too many requests. Please wait a minute." },
+  })
+);
+
+// Writes are rarer; throttle them harder.
+app.use(
+  "/api",
+  rateLimit({
+    windowMs: 60 * 1000,
+    limit: 60,
+    skip: (req) => req.method === "GET" || req.method === "OPTIONS",
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    message: { success: false, message: "Too many changes in a short time. Please wait a minute." },
+  })
+);
 
 // --------------------------------------------------
 // 1. CORS CONFIGURATION
 // --------------------------------------------------
 
-const allowedOrigins = (process.env.FRONTEND_URLS || "http://localhost:3000")
+const allowedOrigins = (
+  process.env.FRONTEND_URLS || "http://localhost:3000"
+)
   .split(",")
   .map((url) => url.trim().replace(/\/$/, ""))
   .filter(Boolean);
@@ -22,8 +77,10 @@ const allowedOrigins = (process.env.FRONTEND_URLS || "http://localhost:3000")
 app.use(
   cors({
     origin(origin, callback) {
-      // Allow requests without an Origin header, such as server-to-server calls.
-      if (!origin || allowedOrigins.includes(origin.replace(/\/$/, ""))) {
+      if (
+        !origin ||
+        allowedOrigins.includes(origin.replace(/\/$/, ""))
+      ) {
         return callback(null, true);
       }
 
@@ -32,6 +89,7 @@ app.use(
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    maxAge: 600,
   })
 );
 
@@ -48,11 +106,22 @@ app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
 app.use(clerkMiddleware());
 
+// Serverless (Vercel) has no startup hook: make sure the cached DB
+// connection is ready before any API handler runs.
+app.use("/api", async (req, res, next) => {
+  if (req.path === "/health") return next();
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
 // --------------------------------------------------
-// 4. BASIC ROUTES
+// 4. ROOT ROUTE
 // --------------------------------------------------
 
-// Root endpoint
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
@@ -61,7 +130,10 @@ app.get("/", (req, res) => {
   });
 });
 
-// API health check
+// --------------------------------------------------
+// 5. HEALTH CHECK
+// --------------------------------------------------
+
 app.get("/api/health", (req, res) => {
   const databaseConnected = mongoose.connection.readyState === 1;
 
@@ -76,48 +148,28 @@ app.get("/api/health", (req, res) => {
 });
 
 // --------------------------------------------------
-// 5. API NOT FOUND HANDLER
+// 6. USER ROUTES
 // --------------------------------------------------
 
-app.use("/api", (req, res) => {
-  res.status(404).json({
-    success: false,
-    message: "API endpoint not found",
-    path: req.originalUrl,
-  });
-});
+// accountRoutes replaces the old userRoutes (ported from the exams app; it
+// referenced undefined ALL_ROLES / canManage and had no permission checks).
+app.use("/api/users", accountRoutes);
+app.use("/api/projects", projectRoutes);
 
 // --------------------------------------------------
-// 6. CENTRALIZED ERROR HANDLER
+// 7. API NOT FOUND HANDLER
 // --------------------------------------------------
 
-app.use((err, req, res, next) => {
-  if (res.headersSent) {
-    return next(err);
-  }
-
-  const statusCode = err.status || err.statusCode || 500;
-
-  if (err.message?.startsWith("CORS blocked origin:")) {
-    return res.status(403).json({
-      success: false,
-      message: "Origin not allowed by CORS",
-    });
-  }
-
-  console.error("API Error:", err);
-
-  res.status(statusCode >= 400 && statusCode < 600 ? statusCode : 500).json({
-    success: false,
-    message:
-      process.env.NODE_ENV === "production"
-        ? "Internal server error"
-        : err.message || "Internal server error",
-  });
-});
+app.use("/api", notFound);
 
 // --------------------------------------------------
-// 7. START SERVER AFTER DATABASE CONNECTION
+// 8. CENTRALIZED ERROR HANDLER
+// --------------------------------------------------
+
+app.use(errorHandler);
+
+// --------------------------------------------------
+// 9. START SERVER
 // --------------------------------------------------
 
 export default app;
@@ -138,4 +190,3 @@ if (process.env.NODE_ENV !== "production") {
 
   startServer();
 }
-

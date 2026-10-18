@@ -1,26 +1,107 @@
 @import "tailwindcss";
 
+/*
+  CCTEK neumorphism.
+  Surfaces share the page colour and get depth from two shadows: a light
+  one up-left and a dark one down-right. Keep text contrast high: soft UI
+  fails accessibility when labels are also "soft", so text stays dark and
+  status always has a colour + word, never shadow alone.
+*/
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --neu-bg: #e8ebf0;
+  --neu-light: #ffffff;
+  --neu-dark: #c3c9d4;
+  --neu-text: #1f2937;
+  --neu-muted: #5b6475;
+  --neu-accent: #d97706; /* CCTEK amber */
+  --neu-accent-ink: #1f1300;
+  --neu-ok: #047857;
+  --neu-warn: #b45309;
+  --neu-bad: #b91c1c;
+  --neu-radius: 18px;
+  --neu-distance: 6px;
+  --neu-blur: 14px;
+}
+
+/* Light theme only: the header and sidebar are light, so following the
+   computer's dark mode made the page half dark, half white. */
+:root {
+  color-scheme: light;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-neu: var(--neu-bg);
+  --color-neu-text: var(--neu-text);
+  --color-neu-muted: var(--neu-muted);
+  --color-neu-accent: var(--neu-accent);
+  --color-neu-ok: var(--neu-ok);
+  --color-neu-warn: var(--neu-warn);
+  --color-neu-bad: var(--neu-bad);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+body {
+  background: var(--neu-bg);
+  color: var(--neu-text);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Raised card / panel */
+@utility neu-raised {
+  background: var(--neu-bg);
+  border-radius: var(--neu-radius);
+  box-shadow:
+    var(--neu-distance) var(--neu-distance) var(--neu-blur) var(--neu-dark),
+    calc(var(--neu-distance) * -1) calc(var(--neu-distance) * -1) var(--neu-blur) var(--neu-light);
+}
+
+/* Small raised element: buttons, chips */
+@utility neu-raised-sm {
+  background: var(--neu-bg);
+  border-radius: 12px;
+  box-shadow:
+    3px 3px 7px var(--neu-dark),
+    -3px -3px 7px var(--neu-light);
+}
+
+/* Pressed-in: inputs, search boxes, active tab, pressed button */
+@utility neu-inset {
+  background: var(--neu-bg);
+  border-radius: 12px;
+  box-shadow:
+    inset 3px 3px 7px var(--neu-dark),
+    inset -3px -3px 7px var(--neu-light);
+}
+
+/* Primary action: solid accent so it is obvious, not just a shadow */
+@utility neu-primary {
+  background: var(--neu-accent);
+  color: var(--neu-accent-ink);
+  border-radius: 12px;
+  font-weight: 700;
+  box-shadow:
+    3px 3px 7px var(--neu-dark),
+    -3px -3px 7px var(--neu-light);
+}
+
+@utility neu-press {
+  transition: box-shadow 150ms ease, transform 150ms ease;
+  &:active {
+    transform: translateY(1px);
+    box-shadow:
+      inset 3px 3px 7px var(--neu-dark),
+      inset -3px -3px 7px var(--neu-light);
+  }
+  &:focus-visible {
+    outline: 3px solid var(--neu-accent);
+    outline-offset: 3px;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
 }

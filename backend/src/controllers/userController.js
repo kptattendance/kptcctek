@@ -7,8 +7,7 @@ import axios from "axios";
 
 
 import User, { DESIGNATIONS, normalizeDesignation, collegeOf } from "../models/User.js";
-import Student from "../models/Student.js";
-import Subject from "../models/Subject.js";
+
 import { ROLES } from "../config/roles.js";
 // import Attendance from "../models/Attendance.js";
 // import IAMarks from "../models/IAMarks.js";

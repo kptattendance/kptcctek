@@ -6,11 +6,12 @@ import { ROLES } from "../config/roles.js";
 
 const userSchema = new mongoose.Schema(
   {
+    // Empty until the person's first Google sign-in; the admin registers the
+    // email first and the account is linked by verified email on first login.
     clerkId: {
       type: String,
-      required: true,
       unique: true,
-      index: true,
+      sparse: true,
     },
 
     name: {
@@ -24,6 +25,7 @@ const userSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
       required: true,
+      unique: true,
     },
 
     phone: {
@@ -34,11 +36,16 @@ const userSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      // See config/roles.js. "exam_officer" and "student" are old values
-      // kept only so existing records still load.
-      enum: [...ROLES, "exam_officer", "student"],
+      enum: ROLES,
       required: true,
     },
+
+    // Switch off to block access immediately (no delete; history stays).
+    isActive: { type: Boolean, default: true, index: true },
+    lastLoginAt: { type: Date, default: null },
+
+    // For remuneration statements and TDS
+    pan: { type: String, trim: true, uppercase: true, default: "", match: [/^$|^[A-Z]{5}[0-9]{4}[A-Z]$/, "Invalid PAN"] },
 
     department: {
       type: String,
@@ -89,6 +96,24 @@ export const DESIGNATIONS = [
   "Vice-Principal",
   "Principal",
   "Guest Lecturer",
+  "Office Superintendent",
+  "Accounts Staff",
+  "Technical Staff",
+  "Office Staff",
+];
+
+// Codes stored in `department`, with the names shown in forms.
+export const DEPARTMENTS = [
+  { code: "ce", label: "Civil Engineering" },
+  { code: "me", label: "Mechanical Engineering" },
+  { code: "ee", label: "Electrical & Electronics Engineering" },
+  { code: "ec", label: "Electronics & Communication" },
+  { code: "cs", label: "Computer Science" },
+  { code: "at", label: "Automobile Engineering" },
+  { code: "ch", label: "Chemical Engineering" },
+  { code: "ps", label: "Polymer Science" },
+  { code: "sc", label: "Science" },
+  { code: "ot", label: "Office / Other" },
 ];
 
 // "SELECTION GRADE LECTURER" / "selection grade" -> "Selection Grade Lecturer";
@@ -103,6 +128,8 @@ export function normalizeDesignation(value) {
   if (v === "vice principal" || v === "vp") return "Vice-Principal";
   if (v === "principal") return "Principal";
   if (v === "guest lecturer" || v === "guest faculty") return "Guest Lecturer";
+  const exact = DESIGNATIONS.find((d) => d.toLowerCase() === v);
+  if (exact) return exact;
   return null;
 }
 

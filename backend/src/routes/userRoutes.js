@@ -13,9 +13,9 @@ import {
   getDashboardStats,
 } from "../controllers/userController.js";
 import { uploadSingleImage } from "../middlewares/uploadImage.js";
-import { authenticateUser } from "../middlewares/authMiddleware.js";
 import multer from "multer";
 import { requireStepUp } from "../services/stepUp.js";
+import { authenticateUser } from "../middlewares/requireAuth.js";
 const router = express.Router();
 
 const uploadExcel = multer({
