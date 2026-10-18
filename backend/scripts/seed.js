@@ -1,6 +1,6 @@
 // scripts/seed.js
 // One-time setup:  ADMIN_EMAIL=you@gmail.com ADMIN_NAME="Your Name" npm run seed
-// Safe to run again: existing records are left as they are.
+// Safe to run again: parties and users are left as they are; the fee rule is updated.
 
 import dotenv from "dotenv";
 import mongoose from "mongoose";
@@ -8,6 +8,7 @@ import connectDB from "../src/config/db.js";
 import Party from "../src/models/Party.js";
 import BillingRule from "../src/models/BillingRule.js";
 import User from "../src/models/User.js";
+import Settings from "../src/models/Settings.js";
 import { DEFAULT_RULE } from "../src/services/billingService.js";
 
 dotenv.config();
@@ -24,18 +25,6 @@ const PARTIES = [
   { code: "VENLOC", name: "Venloc", gstMode: "inclusive" },
 ];
 
-// CCTEK share use, from the monthly remuneration sheets.
-const FUND_ALLOCATION = [
-  { key: "reserve", label: "Reserve", percent: 10 / 0.75 },
-  { key: "student_welfare", label: "Student Welfare", percent: 15 / 0.75 },
-  { key: "staff_welfare", label: "Staff Welfare", percent: 18 / 0.75 },
-  { key: "infrastructure", label: "Infrastructure", percent: 20 / 0.75 },
-  { key: "wid", label: "WID", percent: 5 / 0.75 },
-  { key: "environment", label: "Environment", percent: 2 / 0.75 },
-  { key: "repair", label: "Repair & Maintenance", percent: 2 / 0.75 },
-  { key: "contingency", label: "Contingencies", percent: 3 / 0.75 },
-];
-
 async function main() {
   await connectDB();
 
@@ -44,15 +33,25 @@ async function main() {
   }
   console.log(`Parties: ${await Party.countDocuments()}`);
 
-  if (!(await BillingRule.exists({ code: DEFAULT_RULE.code }))) {
-    await BillingRule.create({
-      ...DEFAULT_RULE,
-      description: "Slabs 0.5/0.7/0.8%, GST 18%, TA Rs 15/km, 45/10/25/20 split, profit 25% DTE / 75% CCTEK",
-      effectiveFrom: new Date("2025-04-01"),
-      fundAllocation: FUND_ALLOCATION,
-    });
-    console.log(`Billing rule ${DEFAULT_RULE.code} created.`);
-  }
+  // The rule is kept in step with the code (no bills are made under it yet
+  // when it changes; later policy changes get a new code instead).
+  await BillingRule.updateOne(
+    { code: DEFAULT_RULE.code },
+    {
+      $set: {
+        ...DEFAULT_RULE,
+        description: "Slabs 0.5/0.7/0.8%, GST 18%, TA Rs 15/km, 45/10/25/20 split, balance in 9 heads (DTE 25%)",
+        effectiveFrom: new Date("2025-04-01"),
+        isActive: true,
+      },
+      $unset: { fundAllocation: 1 },
+    },
+    { upsert: true, runValidators: true }
+  );
+  console.log(`Billing rule ${DEFAULT_RULE.code} is up to date.`);
+
+  // Details printed on bills; edit them in the app (Billing > Settings).
+  await Settings.updateOne({ _id: "cctek" }, { $setOnInsert: { _id: "cctek" } }, { upsert: true });
 
   const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
   if (email) {

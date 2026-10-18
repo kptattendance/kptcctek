@@ -28,4 +28,4 @@ export const daysSince = (d) => Math.max(0, Math.floor((Date.now() - new Date(d)
 export const isoToday = () => new Date().toISOString().slice(0, 10);
 
 // Amber after a week, red after two: for work still waiting on someone.
-export const ageClass = (days) => (days > 14 ? "text-neu-bad font-bold" : days > 7 ? "text-neu-warn font-bold" : "text-neu-muted");
+export const ageClass = (days) => (days > 14 ? "text-cc-bad font-bold" : days > 7 ? "text-cc-warn font-bold" : "text-cc-muted");

@@ -14,19 +14,19 @@ function Row({ label, kn, children }) {
   if (children == null || children === "" || children === "—") return null;
   return (
     <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3 py-1.5">
-      <dt className="text-xs font-semibold text-neu-muted">
+      <dt className="text-xs font-semibold text-cc-muted">
         {label}
         {kn && <span className="block font-medium">{kn}</span>}
       </dt>
-      <dd className="text-sm font-semibold text-neu-text">{children}</dd>
+      <dd className="text-sm font-semibold text-cc-text">{children}</dd>
     </div>
   );
 }
 
 function Section({ title, children }) {
   return (
-    <section className="neu-raised-sm p-4">
-      <h3 className="mb-1 text-xs font-extrabold uppercase tracking-wide text-neu-muted">{title}</h3>
+    <section className="cc-chip p-4">
+      <h3 className="mb-1 text-xs font-extrabold uppercase tracking-wide text-cc-muted">{title}</h3>
       <dl className="divide-y divide-black/5">{children}</dl>
     </section>
   );
@@ -78,21 +78,21 @@ export default function ProjectDrawer({ projectId, onClose, actions, refreshKey 
   return (
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Application details">
       <button type="button" aria-label="Close" className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <aside className="absolute inset-y-0 right-0 flex w-full max-w-xl flex-col bg-neu shadow-2xl">
+      <aside className="absolute inset-y-0 right-0 flex w-full max-w-xl flex-col bg-cc-bg shadow-2xl">
         <header className="flex items-start justify-between gap-4 p-5">
           {p ? (
             <div>
               <p className="text-lg font-extrabold">
                 App {p.appNo} · Sl. {p.serialNo}
               </p>
-              <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-neu-muted">
+              <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-cc-muted">
                 <StatusBadge status={p.status} /> {p.party?.code} · {fmtDate(p.appDate)}
               </p>
             </div>
           ) : (
-            <LoaderCircle className="animate-spin text-neu-accent" aria-label="Loading" />
+            <LoaderCircle className="animate-spin text-cc-primary" aria-label="Loading" />
           )}
-          <button type="button" onClick={onClose} aria-label="Close" className="neu-raised-sm neu-press p-2">
+          <button type="button" onClick={onClose} aria-label="Close" className="cc-chip cc-press p-2">
             <X size={18} />
           </button>
         </header>
@@ -129,9 +129,9 @@ export default function ProjectDrawer({ projectId, onClose, actions, refreshKey 
                   {p.team?.length ? (
                     <span className="flex flex-wrap gap-2">
                       {p.team.map((m) => (
-                        <span key={m.user?._id} className="neu-raised-sm flex items-center gap-2 py-1 pl-1 pr-3 text-xs">
+                        <span key={m.user?._id} className="cc-chip flex items-center gap-2 py-1 pl-1 pr-3 text-xs">
                           <Avatar name={m.user?.name || "?"} src={m.user?.imageUrl} size={22} />
-                          {m.user?.name} <span className="text-neu-muted">{m.role}</span>
+                          {m.user?.name} <span className="text-cc-muted">{m.role}</span>
                         </span>
                       ))}
                     </span>
@@ -158,20 +158,20 @@ export default function ProjectDrawer({ projectId, onClose, actions, refreshKey 
               </Section>
 
               {p.inward?.scan && (
-                <button type="button" onClick={openScan} disabled={opening} className="neu-raised-sm neu-press flex w-full items-center justify-center gap-2 px-4 py-3 text-sm font-semibold">
-                  {opening ? <LoaderCircle size={16} className="animate-spin" /> : <FileText size={16} />} Open scanned letter <ExternalLink size={14} className="text-neu-muted" />
+                <button type="button" onClick={openScan} disabled={opening} className="cc-chip cc-press flex w-full items-center justify-center gap-2 px-4 py-3 text-sm font-semibold">
+                  {opening ? <LoaderCircle size={16} className="animate-spin" /> : <FileText size={16} />} Open scanned letter <ExternalLink size={14} className="text-cc-muted" />
                 </button>
               )}
 
               {p.statusHistory?.length > 0 && (
-                <section className="neu-raised-sm p-4">
-                  <h3 className="mb-3 text-xs font-extrabold uppercase tracking-wide text-neu-muted">History · ಇತಿಹಾಸ</h3>
+                <section className="cc-chip p-4">
+                  <h3 className="mb-3 text-xs font-extrabold uppercase tracking-wide text-cc-muted">History · ಇತಿಹಾಸ</h3>
                   <ol className="space-y-3 border-l-2 border-black/10 pl-4">
                     {[...p.statusHistory].reverse().map((h, i) => (
                       <li key={i} className="text-sm">
                         <span className="font-semibold">{STATUS[h.to]?.label || h.to}</span>
-                        <span className="text-neu-muted"> · {fmtDate(h.at)}{h.by?.name ? ` · ${h.by.name}` : ""}</span>
-                        {h.note && <span className="block text-xs text-neu-muted">{h.note}</span>}
+                        <span className="text-cc-muted"> · {fmtDate(h.at)}{h.by?.name ? ` · ${h.by.name}` : ""}</span>
+                        {h.note && <span className="block text-xs text-cc-muted">{h.note}</span>}
                       </li>
                     ))}
                   </ol>

@@ -1,14 +1,14 @@
 // Where each role lands after sign-in (/auth/check). Keys must match
 // backend/src/config/roles.js. Pages not built yet fall back to /auth/check.
 export const HOME_BY_ROLE = {
-  admin: "/admin/dashboard",
-  manager: "/admin/dashboard",
+  admin: "/overview",
+  manager: "/overview",
   office_staff: "/office/incoming",
   work_coordinator: "/coordinator",
   faculty: "/faculty",
-  accounts: "/accounts/dashboard",
-  approver: "/approvals/dashboard",
-  auditor: "/reports/dashboard",
+  accounts: "/billing/bills",
+  approver: "/overview",
+  auditor: "/overview",
 };
 
 export const DEFAULT_DASHBOARD = "/auth/check";
@@ -36,19 +36,36 @@ export const SECTIONS = [
     title: "My work",
     kn: "ನನ್ನ ಕೆಲಸ",
     roles: ["faculty", "work_coordinator", "manager"],
-    items: [{ href: "/faculty", label: "My inspections", kn: "ನನ್ನ ತಪಾಸಣೆಗಳು", icon: "ClipboardCheck" }],
+    items: [
+      { href: "/faculty", label: "My inspections", kn: "ನನ್ನ ತಪಾಸಣೆಗಳು", icon: "ClipboardCheck" },
+      { href: "/faculty/earnings", label: "My remuneration", kn: "ನನ್ನ ಸಂಭಾವನೆ", icon: "Wallet" },
+    ],
+  },
+  {
+    title: "Billing",
+    kn: "ಬಿಲ್ಲಿಂಗ್",
+    roles: ["work_coordinator", "office_staff", "manager", "accounts", "approver", "auditor"],
+    items: [
+      { href: "/billing", label: "Ready to bill", kn: "ಬಿಲ್ ಮಾಡಬೇಕಾದವು", icon: "FilePlus2", roles: ["work_coordinator", "office_staff", "manager", "accounts"] },
+      { href: "/billing/bills", label: "Bills", kn: "ಬಿಲ್‌ಗಳು", icon: "FileText" },
+      { href: "/billing/receipts", label: "Cheques received", kn: "ಸ್ವೀಕರಿಸಿದ ಚೆಕ್‌ಗಳು", icon: "Wallet" },
+      { href: "/billing/distribution", label: "Distribution", kn: "ಹಂಚಿಕೆ", icon: "HandCoins" },
+      { href: "/billing/settings", label: "Bill settings", kn: "ಬಿಲ್ ವಿವರಗಳು", icon: "Settings", roles: ["manager"] },
+    ],
+  },
+  {
+    title: "Overview",
+    kn: "ಸಾರಾಂಶ",
+    roles: ["manager", "approver", "auditor", "accounts", "work_coordinator"],
+    items: [{ href: "/overview", label: "Money overview", kn: "ಹಣಕಾಸು ಸಾರಾಂಶ", icon: "PieChart" }],
   },
   {
     title: "Administration",
     kn: "ಆಡಳಿತ",
-    roles: ["manager"],
-    items: [
-      { href: "/admin/dashboard", label: "Admin dashboard", kn: "ಆಡಳಿತ ಫಲಕ", icon: "LayoutDashboard" },
-      { href: "/admin/users", label: "Users", kn: "ಬಳಕೆದಾರರು", icon: "Users", roles: [] }, // admin only
-    ],
+    roles: [],
+    items: [{ href: "/admin/users", label: "Users", kn: "ಬಳಕೆದಾರರು", icon: "Users" }],
   },
 ];
-
 export function sectionsFor(role) {
   const ok = (roles) => role === "admin" || roles.includes(role);
   return SECTIONS.filter((s) => ok(s.roles))

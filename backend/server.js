@@ -9,6 +9,7 @@ import connectDB from "./src/config/db.js";
 
 import accountRoutes from "./src/routes/accountRoutes.js";
 import projectRoutes from "./src/routes/projectRoutes.js";
+import billingRoutes from "./src/routes/billingRoutes.js";
 import { errorHandler, notFound } from "./src/middlewares/errorHandler.js";
 
 dotenv.config();
@@ -151,10 +152,9 @@ app.get("/api/health", (req, res) => {
 // 6. USER ROUTES
 // --------------------------------------------------
 
-// accountRoutes replaces the old userRoutes (ported from the exams app; it
-// referenced undefined ALL_ROLES / canManage and had no permission checks).
 app.use("/api/users", accountRoutes);
 app.use("/api/projects", projectRoutes);
+app.use("/api/billing", billingRoutes);
 
 // --------------------------------------------------
 // 7. API NOT FOUND HANDLER

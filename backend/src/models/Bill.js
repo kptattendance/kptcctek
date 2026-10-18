@@ -1,59 +1,102 @@
 // src/models/Bill.js
-// A service bill sent to one party, covering one or more reported projects.
-// Once approved, its lines and totals are frozen; corrections are made by
-// cancelling and re-issuing, never by editing (audit-safe).
+// A service bill sent to one party for one or more inspected applications.
+//
+//   draft  -> issued (gets its number CCTEK/2026-27/0001, applications become "billed")
+//   issued -> part_paid -> paid (receipts; applications become "paid" and are
+//             handed to distribution)
+//   draft / issued (nothing received) -> cancelled (applications go back to "ready to bill")
+//
+// Every line is a frozen copy of the application's fee, so a later change to
+// the application or the fee rule never changes a bill already sent.
 
 import mongoose from "mongoose";
 
-export const BILL_STATUSES = ["draft", "approved", "sent", "partially_paid", "paid", "cancelled"];
+export const BILL_STATUSES = ["draft", "issued", "part_paid", "paid", "cancelled"];
 
 const money = { type: Number, default: 0, min: 0 }; // paise
 
-const billLineSchema = new mongoose.Schema(
+const lineSchema = new mongoose.Schema(
   {
     project: { type: mongoose.Schema.Types.ObjectId, ref: "Project", required: true },
     appNo: String,
-    certificateNo: String,
+    appDate: Date,
+    ward: String,
+    fileNo: String,
+    workYear: String,
+    description: String,
     contractorName: String,
+    certificateNo: String,
     projectBillAmount: money,
-    servicePercent: Number,
-    net: money,
+    servicePercent: Number, // null when lumpsum
+    lumpsum: Boolean,
+    ruleCode: String,
+    net: money, // fee without GST
     gst: money,
-    total: money,
+    total: money, // net + gst, what the party pays for this line
+    km: Number,
+    ta: money,
   },
   { _id: false }
 );
 
 const billSchema = new mongoose.Schema(
   {
-    billNo: { type: String, required: true, unique: true }, // "CCTEK/2025-26/0042"
-    financialYear: { type: String, required: true, index: true },
-    billDate: { type: Date, required: true },
-    party: { type: mongoose.Schema.Types.ObjectId, ref: "Party", required: true, index: true },
-    gstMode: { type: String, enum: ["inclusive", "exclusive"], required: true },
-    lines: { type: [billLineSchema], validate: [(v) => v.length > 0, "A bill needs at least one project."] },
-
-    subtotal: money, // sum of net
-    gstTotal: money,
-    grandTotal: money, // what the party pays
-    amountReceived: money,
-
+    number: { type: String, default: null }, // set on issue
+    financialYear: { type: String, default: null },
+    seq: { type: Number, default: null },
     status: { type: String, enum: BILL_STATUSES, default: "draft", index: true },
-    pdfUrl: { type: String, default: "" },
-    pdfPublicId: { type: String, default: "" },
 
-    preparedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
-    approvedAt: { type: Date, default: null },
-    sentAt: { type: Date, default: null },
+    party: { type: mongoose.Schema.Types.ObjectId, ref: "Party", required: true, index: true },
+    // copy of the party at issue time (the printed bill must not change)
+    partySnapshot: {
+      code: String,
+      name: String,
+      billingAddress: String,
+      gstin: String,
+    },
+    gstMode: { type: String, enum: ["inclusive", "exclusive"], required: true },
+    billDate: { type: Date, required: true },
+    dueDate: { type: Date, default: null },
+    subject: { type: String, trim: true, default: "", maxlength: 300 },
+    remarks: { type: String, trim: true, default: "", maxlength: 1000 },
+
+    lines: { type: [lineSchema], validate: [(v) => v.length > 0, "A bill needs at least one application."] },
+    totals: {
+      net: money,
+      cgst: money,
+      sgst: money,
+      gst: money,
+      total: money,
+    },
+    // kept in step by the receipts controller
+    settled: {
+      received: money, // money that reached the bank
+      tds: money, // income-tax TDS + GST TDS deducted by the party
+      other: money, // other deductions
+      total: money, // received + tds + other
+      lastReceiptOn: { type: Date, default: null },
+    },
+
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    issuedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    issuedAt: { type: Date, default: null },
+    sentOn: { type: Date, default: null }, // date given to the party / dispatched
+    dispatchRef: { type: String, trim: true, default: "", maxlength: 120 },
+    paidAt: { type: Date, default: null },
     cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
-    cancelReason: { type: String, default: "" },
+    cancelledAt: { type: Date, default: null },
+    cancelReason: { type: String, trim: true, default: "" },
   },
   { timestamps: true }
 );
 
-billSchema.virtual("balance").get(function () {
-  return Math.max(0, this.grandTotal - this.amountReceived);
+billSchema.index({ number: 1 }, { unique: true, partialFilterExpression: { number: { $type: "string" } } });
+billSchema.index({ financialYear: 1, status: 1 });
+billSchema.index({ billDate: -1 });
+
+billSchema.virtual("outstanding").get(function () {
+  if (["draft", "cancelled"].includes(this.status)) return 0;
+  return Math.max(0, (this.totals?.total || 0) - (this.settled?.total || 0));
 });
 billSchema.set("toJSON", { virtuals: true });
 

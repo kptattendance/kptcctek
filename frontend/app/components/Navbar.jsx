@@ -57,19 +57,19 @@ export default function Navbar() {
   }, [getToken, isLoaded, isSignedIn]);
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+    <nav className="sticky top-0 z-50 border-b border-cc-border bg-white/95 backdrop-blur-md">
+      <div className="flex h-16 items-center justify-between px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-400 text-sm font-extrabold text-slate-900 shadow-sm">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cc-sidebar text-sm font-extrabold text-cc-accent">
             CC
           </span>
 
           <span className="leading-tight">
-            <span className="block text-lg font-extrabold tracking-tight text-slate-900">
+            <span className="block text-lg font-extrabold tracking-tight text-cc-text">
               CCTEK
             </span>
-            <span className="hidden text-xs text-slate-500 sm:block">
-              Project & Billing Management
+            <span className="hidden text-xs text-cc-muted sm:block">
+              Third-party inspection · KPT Mangaluru
             </span>
           </span>
         </Link>
@@ -78,7 +78,7 @@ export default function Navbar() {
           <Show when="signed-in">
             <Link
               href={dashboard}
-              className="rounded-xl bg-amber-400 px-4 py-2.5 text-sm font-bold text-slate-900 transition hover:bg-amber-500"
+              className="cc-btn-primary cc-press px-4 py-2 text-sm"
             >
               My dashboard
             </Link>
@@ -96,7 +96,7 @@ export default function Navbar() {
 
           <Show when="signed-out">
             <SignInButton mode="modal">
-              <button className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700">
+              <button className="cc-btn-primary cc-press px-5 py-2 text-sm">
                 Sign in
               </button>
             </SignInButton>

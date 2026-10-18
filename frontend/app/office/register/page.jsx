@@ -36,9 +36,9 @@ export default function RegisterPage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold">Register</h1>
-          <p className="text-sm text-neu-muted">ನೋಂದಣಿ ಪುಸ್ತಕ · This financial year. Tap a row to see the full entry.</p>
+          <p className="text-sm text-cc-muted">ನೋಂದಣಿ ಪುಸ್ತಕ · This financial year. Tap a row to see the full entry.</p>
         </div>
-        <Link href="/office/incoming" className="neu-primary neu-press flex items-center gap-2 px-4 py-2.5 text-sm">
+        <Link href="/office/incoming" className="cc-btn-primary cc-press flex items-center gap-2 px-4 py-2.5 text-sm">
           <ScanLine size={16} aria-hidden /> New letter
         </Link>
       </header>

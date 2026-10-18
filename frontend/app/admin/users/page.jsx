@@ -74,23 +74,23 @@ export default function UsersPage() {
   }
 
   const pages = Math.max(1, Math.ceil(total / PAGE));
-  const selectCls = "neu-inset px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-neu-accent";
+  const selectCls = "cc-field px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-cc-primary";
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 text-neu-text">
+    <div className="mx-auto max-w-6xl space-y-6 text-cc-text">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-extrabold">Users & staff</h1>
-          <p className="mt-1 text-sm text-neu-muted">{total} people</p>
+          <p className="mt-1 text-sm text-cc-muted">{total} people</p>
         </div>
-        <Link href="/admin/users/new" className="neu-primary neu-press flex items-center justify-center gap-2 px-5 py-3 text-sm">
+        <Link href="/admin/users/new" className="cc-btn-primary cc-press flex items-center justify-center gap-2 px-5 py-3 text-sm">
           <UserPlus size={18} aria-hidden /> Add user
         </Link>
       </header>
 
-      <section className="neu-raised grid gap-3 p-4 sm:grid-cols-[1fr_auto_auto]">
-        <label className="neu-inset flex items-center gap-2 px-4 py-3">
-          <Search size={16} className="text-neu-muted" aria-hidden />
+      <section className="cc-card grid gap-3 p-4 sm:grid-cols-[1fr_auto_auto]">
+        <label className="cc-field flex items-center gap-2 px-4 py-3">
+          <Search size={16} className="text-cc-muted" aria-hidden />
           <span className="sr-only">Search</span>
           <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Name or email" className="w-full bg-transparent text-sm outline-none" />
         </label>
@@ -106,11 +106,11 @@ export default function UsersPage() {
       </section>
 
 
-      <section className="neu-raised p-2">
+      <section className="cc-card p-2">
         {loading ? (
-          <div className="flex justify-center p-10"><LoaderCircle className="animate-spin text-neu-accent" aria-label="Loading" /></div>
+          <div className="flex justify-center p-10"><LoaderCircle className="animate-spin text-cc-primary" aria-label="Loading" /></div>
         ) : items.length === 0 ? (
-          <p className="p-10 text-center text-sm text-neu-muted">No users found.</p>
+          <p className="p-10 text-center text-sm text-cc-muted">No users found.</p>
         ) : (
           <ul className="divide-y divide-black/5">
             {items.map((u) => {
@@ -120,7 +120,7 @@ export default function UsersPage() {
                   <Avatar name={u.name} src={u.imageUrl} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold">{u.name}</p>
-                    <p className="truncate text-sm text-neu-muted">{u.email}{u.designation ? ` · ${u.designation}` : ""}</p>
+                    <p className="truncate text-sm text-cc-muted">{u.email}{u.designation ? ` · ${u.designation}` : ""}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
                     <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-900">{u.roleLabel}</span>
@@ -133,11 +133,11 @@ export default function UsersPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <Link href={`/admin/users/${u._id}/edit`} aria-label={`Edit ${u.name}`} className="neu-raised-sm neu-press p-2.5"><Pencil size={16} /></Link>
-                    <button type="button" onClick={() => toggleActive(u)} disabled={busyId === u._id} aria-label={inactive ? `Activate ${u.name}` : `Deactivate ${u.name}`} title={inactive ? "Activate" : "Deactivate"} className={`neu-raised-sm neu-press p-2.5 ${inactive ? "text-neu-ok" : "text-neu-warn"}`}>
+                    <Link href={`/admin/users/${u._id}/edit`} aria-label={`Edit ${u.name}`} className="cc-chip cc-press p-2.5"><Pencil size={16} /></Link>
+                    <button type="button" onClick={() => toggleActive(u)} disabled={busyId === u._id} aria-label={inactive ? `Activate ${u.name}` : `Deactivate ${u.name}`} title={inactive ? "Activate" : "Deactivate"} className={`cc-chip cc-press p-2.5 ${inactive ? "text-cc-ok" : "text-cc-warn"}`}>
                       {busyId === u._id ? <LoaderCircle size={16} className="animate-spin" /> : <Power size={16} />}
                     </button>
-                    <button type="button" onClick={() => { setDeleteError(""); setConfirm(u); }} aria-label={`Delete ${u.name}`} className="neu-raised-sm neu-press p-2.5 text-neu-bad"><Trash2 size={16} /></button>
+                    <button type="button" onClick={() => { setDeleteError(""); setConfirm(u); }} aria-label={`Delete ${u.name}`} className="cc-chip cc-press p-2.5 text-cc-bad"><Trash2 size={16} /></button>
                   </div>
                 </li>
               );
@@ -148,26 +148,26 @@ export default function UsersPage() {
 
       {pages > 1 && (
         <div className="flex items-center justify-center gap-3 text-sm">
-          <button disabled={page <= 1} onClick={() => setPage(page - 1)} className="neu-raised-sm neu-press px-4 py-2 font-semibold disabled:opacity-40">Previous</button>
-          <span className="text-neu-muted">Page {page} of {pages}</span>
-          <button disabled={page >= pages} onClick={() => setPage(page + 1)} className="neu-raised-sm neu-press px-4 py-2 font-semibold disabled:opacity-40">Next</button>
+          <button disabled={page <= 1} onClick={() => setPage(page - 1)} className="cc-chip cc-press px-4 py-2 font-semibold disabled:opacity-40">Previous</button>
+          <span className="text-cc-muted">Page {page} of {pages}</span>
+          <button disabled={page >= pages} onClick={() => setPage(page + 1)} className="cc-chip cc-press px-4 py-2 font-semibold disabled:opacity-40">Next</button>
         </div>
       )}
 
       {confirm && (
         <div role="dialog" aria-modal="true" aria-labelledby="del-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-          <div className="neu-raised w-full max-w-md p-6">
+          <div className="cc-card w-full max-w-md p-6">
             <div className="flex items-start justify-between gap-4">
               <h2 id="del-title" className="text-lg font-extrabold">Delete {confirm.name}?</h2>
-              <button type="button" onClick={() => setConfirm(null)} aria-label="Close" className="text-neu-muted"><X size={18} /></button>
+              <button type="button" onClick={() => setConfirm(null)} aria-label="Close" className="text-cc-muted"><X size={18} /></button>
             </div>
-            <p className="mt-3 text-sm text-neu-muted">
+            <p className="mt-3 text-sm text-cc-muted">
               This removes their CCTEK record, their Clerk login and their photo. It can&apos;t be undone.
               People with work records can only be deactivated.
             </p>
             <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => setConfirm(null)} className="neu-raised-sm neu-press px-5 py-2.5 text-sm font-semibold">Cancel</button>
-              <button type="button" onClick={doDelete} disabled={busyId === confirm._id} className="neu-raised-sm neu-press flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-neu-bad disabled:opacity-60">
+              <button type="button" onClick={() => setConfirm(null)} className="cc-chip cc-press px-5 py-2.5 text-sm font-semibold">Cancel</button>
+              <button type="button" onClick={doDelete} disabled={busyId === confirm._id} className="cc-chip cc-press flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-cc-bad disabled:opacity-60">
                 {busyId === confirm._id ? <LoaderCircle size={16} className="animate-spin" /> : <Trash2 size={16} />} Delete
               </button>
             </div>

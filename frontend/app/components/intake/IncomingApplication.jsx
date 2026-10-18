@@ -56,9 +56,9 @@ async function shrinkImage(file, maxSide = 2200) {
 function Field({ label, kn, flagged, children, hint }) {
   return (
     <label className="block">
-      <span className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-bold uppercase tracking-wide text-neu-muted">
+      <span className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-bold uppercase tracking-wide text-cc-muted">
         {label}
-        {kn && <span className="text-[13px] font-semibold normal-case tracking-normal text-neu-text/70">{kn}</span>}
+        {kn && <span className="text-[13px] font-semibold normal-case tracking-normal text-cc-text/70">{kn}</span>}
         {flagged && (
           <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold normal-case tracking-normal text-amber-900">
             <TriangleAlert size={11} aria-hidden /> check
@@ -66,13 +66,13 @@ function Field({ label, kn, flagged, children, hint }) {
         )}
       </span>
       {children}
-      {hint && <span className="mt-1 block text-xs text-neu-muted">{hint}</span>}
+      {hint && <span className="mt-1 block text-xs text-cc-muted">{hint}</span>}
     </label>
   );
 }
 
 const inputCls = (flagged) =>
-  `neu-inset w-full px-4 py-3 text-sm text-neu-text outline-none placeholder:text-neu-muted/70 focus-visible:ring-2 focus-visible:ring-neu-accent ${
+  `cc-field w-full px-4 py-3 text-sm text-cc-text outline-none placeholder:text-cc-muted/70 focus-visible:ring-2 focus-visible:ring-cc-primary ${
     flagged ? "ring-2 ring-amber-400" : ""
   }`;
 
@@ -82,8 +82,8 @@ function NameField({ label, kn, value, onChange, onLetter, matches, onPick, flag
     <Field label={label} kn={kn} flagged={flagged}>
       <input value={value} onChange={onChange} className={inputCls(flagged)} />
       {onLetter && (
-        <span className="mt-1.5 block text-xs text-neu-muted">
-          On letter / ಪತ್ರದಲ್ಲಿ: <span className="font-semibold text-neu-text">{onLetter}</span>
+        <span className="mt-1.5 block text-xs text-cc-muted">
+          On letter / ಪತ್ರದಲ್ಲಿ: <span className="font-semibold text-cc-text">{onLetter}</span>
         </span>
       )}
       {matches.length > 0 && (
@@ -93,7 +93,7 @@ function NameField({ label, kn, value, onChange, onLetter, matches, onPick, flag
               key={m.name}
               type="button"
               onClick={() => onPick(m.name)}
-              className={`neu-raised-sm neu-press px-3 py-1 text-xs font-semibold ${m.name === value ? "text-neu-ok" : "text-neu-text"}`}
+              className={`cc-chip cc-press px-3 py-1 text-xs font-semibold ${m.name === value ? "text-cc-ok" : "text-cc-text"}`}
             >
               {m.name}
               {m.learned ? " ✓" : ""}
@@ -279,13 +279,9 @@ export default function IncomingApplication() {
       const [up, read] = await Promise.all([upload.then((r) => ({ ok: r }), (err) => ({ err })), local]);
       // A failed upload only loses the stored copy; the details can still be filled.
       if (up.err && !read?.text) throw up.err;
-      const { scanId: id = null, extracted = null } = up.ok?.data.data || {};
-      setScanId(id);
+      setScanId(up.ok?.data.data?.scanId || null);
 
-      if (extracted) {
-        applyExtraction(extracted); // paid AI reader, only if switched on
-        setStep("review");
-      } else if (read?.text) {
+      if (read?.text) {
         setLetterText(read.text);
         if (!fillFromText(read.text, read.method)) setStep("review");
         if (up.err) notifyWarning(`The details were read, but the copy of the scan was not saved: ${apiError(up.err)}`);
@@ -301,32 +297,6 @@ export default function IncomingApplication() {
       setUploading(false);
       setReading("");
     }
-  }
-
-  // Only used when the paid AI reader is switched on (ANTHROPIC_API_KEY).
-  function applyExtraction(x) {
-    setForm((f) => ({
-      ...f,
-      partyId: x.partyId || f.partyId,
-      letterRefNo: x.letterRefNo || f.letterRefNo,
-      letterDate: /^\d{4}-\d{2}-\d{2}$/.test(x.letterDate) ? x.letterDate : f.letterDate,
-      ward: x.ward || f.ward,
-      fileNo: x.fileNo || f.fileNo,
-      workYear: x.workYear || f.workYear,
-      mbNo: x.mbNo || f.mbNo,
-      workType: x.workType || f.workType,
-      appDetails: x.workDescription || f.appDetails,
-      contractorName: x.contractorName ? pickName(x.contractorName, directory.contractors).name : f.contractorName,
-      partyEngineer: x.engineerName ? pickName(x.engineerName, directory.engineers).name : f.partyEngineer,
-      partyEngineerDesignation: x.engineerDesignation || f.partyEngineerDesignation,
-      projectBillAmount: x.projectBillAmount != null ? String(x.projectBillAmount) : f.projectBillAmount,
-    }));
-    const flagged = new Set((x.uncertainFields || []).map((k) => FLAG_MAP[k] || k));
-    if (!x.partyId) flagged.add("partyId");
-    if (x.projectBillAmount == null) flagged.add("projectBillAmount");
-    setFlags(flagged);
-    setNotice(x.notes || "Read automatically. Please check before registering.");
-    notifyInfo("Read automatically. Please check before registering.", { id: "filled" });
   }
 
   // ------------------------------------------------------------ live fee
@@ -410,9 +380,9 @@ export default function IncomingApplication() {
         onChange={(e) => setLetterText(e.target.value)}
         rows={8}
         placeholder="Paste the letter text here…"
-        className="neu-inset w-full p-4 text-sm leading-6 text-neu-text outline-none focus-visible:ring-2 focus-visible:ring-neu-accent"
+        className="cc-field w-full p-4 text-sm leading-6 text-cc-text outline-none focus-visible:ring-2 focus-visible:ring-cc-primary"
       />
-      <button type="button" onClick={() => fillFromText()} className="neu-primary neu-press flex w-full items-center justify-center gap-2 px-5 py-3 text-sm">
+      <button type="button" onClick={() => fillFromText()} className="cc-btn-primary cc-press flex w-full items-center justify-center gap-2 px-5 py-3 text-sm">
         <Wand2 size={18} aria-hidden /> Fill the form
       </button>
     </div>
@@ -422,8 +392,8 @@ export default function IncomingApplication() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <header>
-        <h1 className="text-2xl font-extrabold text-neu-text">Incoming application</h1>
-        <p className="mt-1 text-sm text-neu-muted">
+        <h1 className="text-2xl font-extrabold text-cc-text">Incoming application</h1>
+        <p className="mt-1 text-sm text-cc-muted">
           ಒಳಬಂದ ಅರ್ಜಿ · Scan the letter, check the details, register.
         </p>
       </header>
@@ -434,37 +404,37 @@ export default function IncomingApplication() {
 
       {step === "capture" && (
         <section className="space-y-6">
-          <div className="neu-raised p-6 sm:p-10">
+          <div className="cc-card p-6 sm:p-10">
             <div className="mx-auto max-w-lg text-center">
-              <div className="neu-inset mx-auto flex h-20 w-20 items-center justify-center rounded-full text-neu-accent">
+              <div className="mx-auto flex h-20 w-20 bg-cc-primary-soft items-center justify-center rounded-full text-cc-primary">
                 <ScanLine size={36} aria-hidden />
               </div>
-              <h2 className="mt-5 text-lg font-bold text-neu-text">Scan the letter · ಪತ್ರವನ್ನು ಸ್ಕ್ಯಾನ್ ಮಾಡಿ</h2>
-              <p className="mt-2 text-sm text-neu-muted">
+              <h2 className="mt-5 text-lg font-bold text-cc-text">Scan the letter · ಪತ್ರವನ್ನು ಸ್ಕ್ಯಾನ್ ಮಾಡಿ</h2>
+              <p className="mt-2 text-sm text-cc-muted">
                 Take a photo or upload the PDF. The details are read and filled in for you to check. Free, and the letter is read on this device.
               </p>
               <div className="mt-7 grid gap-4 sm:grid-cols-2">
-                <button type="button" onClick={() => cameraRef.current?.click()} className="neu-primary neu-press flex items-center justify-center gap-2 px-5 py-3.5 text-sm">
+                <button type="button" onClick={() => cameraRef.current?.click()} className="cc-btn-primary cc-press flex items-center justify-center gap-2 px-5 py-3.5 text-sm">
                   <Camera size={18} aria-hidden /> Take photo
                 </button>
-                <button type="button" onClick={() => fileRef.current?.click()} className="neu-raised-sm neu-press flex items-center justify-center gap-2 px-5 py-3.5 text-sm font-semibold text-neu-text">
+                <button type="button" onClick={() => fileRef.current?.click()} className="cc-chip cc-press flex items-center justify-center gap-2 px-5 py-3.5 text-sm font-semibold text-cc-text">
                   <Upload size={18} aria-hidden /> Upload photo / PDF
                 </button>
               </div>
-              <p className="mt-4 text-xs text-neu-muted">Tip: lay the sheet flat in good light, whole page in the frame, no shadows.</p>
-              <button type="button" onClick={() => setStep("review")} className="mt-5 text-sm font-semibold text-neu-muted underline underline-offset-4 hover:text-neu-text">
+              <p className="mt-4 text-xs text-cc-muted">Tip: lay the sheet flat in good light, whole page in the frame, no shadows.</p>
+              <button type="button" onClick={() => setStep("review")} className="mt-5 text-sm font-semibold text-cc-muted underline underline-offset-4 hover:text-cc-text">
                 Enter details by hand
               </button>
             </div>
           </div>
 
-          <details className="neu-raised p-5">
-            <summary className="flex cursor-pointer items-center gap-2 text-sm font-bold text-neu-text">
+          <details className="cc-card p-5">
+            <summary className="flex cursor-pointer items-center gap-2 text-sm font-bold text-cc-text">
               <ClipboardPaste size={16} aria-hidden /> Photo hard to read? Paste the text from Google Lens instead
             </summary>
-            <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-neu-muted">
-              <li>Google Lens → <span className="font-semibold text-neu-text">Text</span> → <span className="font-semibold text-neu-text">Select all</span> → <span className="font-semibold text-neu-text">Copy</span></li>
-              <li>Paste below and press <span className="font-semibold text-neu-text">Fill the form</span></li>
+            <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-cc-muted">
+              <li>Google Lens → <span className="font-semibold text-cc-text">Text</span> → <span className="font-semibold text-cc-text">Select all</span> → <span className="font-semibold text-cc-text">Copy</span></li>
+              <li>Paste below and press <span className="font-semibold text-cc-text">Fill the form</span></li>
             </ol>
             <div className="mt-3">{pasteBox}</div>
           </details>
@@ -472,21 +442,21 @@ export default function IncomingApplication() {
       )}
 
       {step === "reading" && (
-        <section className="neu-raised flex flex-col items-center gap-4 p-10 text-center" aria-live="polite">
-          <LoaderCircle size={36} className="animate-spin text-neu-accent" aria-hidden />
-          <p className="font-semibold text-neu-text">{reading || "Uploading the letter…"}</p>
-          <p className="text-sm text-neu-muted">Usually 5–15 seconds.</p>
+        <section className="cc-card flex flex-col items-center gap-4 p-10 text-center" aria-live="polite">
+          <LoaderCircle size={36} className="animate-spin text-cc-primary" aria-hidden />
+          <p className="font-semibold text-cc-text">{reading || "Uploading the letter…"}</p>
+          <p className="text-sm text-cc-muted">Usually 5–15 seconds.</p>
         </section>
       )}
 
       {step === "saved" && saved && (
-        <section className="neu-raised p-8 text-center" aria-live="polite">
-          <CircleCheck size={44} className="mx-auto text-neu-ok" aria-hidden />
-          <h2 className="mt-4 text-xl font-extrabold text-neu-text">Registered as Sl. No. {saved.serialNo}</h2>
-          <p className="mt-2 text-sm text-neu-muted">
+        <section className="cc-card p-8 text-center" aria-live="polite">
+          <CircleCheck size={44} className="mx-auto text-cc-ok" aria-hidden />
+          <h2 className="mt-4 text-xl font-extrabold text-cc-text">Registered as Sl. No. {saved.serialNo}</h2>
+          <p className="mt-2 text-sm text-cc-muted">
             Application {saved.appNo} · {saved.financialYear} · CCTEK fee {formatRupees(saved.charges?.invoiceTotal)}
           </p>
-          <button type="button" onClick={reset} className="neu-primary neu-press mx-auto mt-7 flex items-center gap-2 px-6 py-3.5 text-sm">
+          <button type="button" onClick={reset} className="cc-btn-primary cc-press mx-auto mt-7 flex items-center gap-2 px-6 py-3.5 text-sm">
             <ScanLine size={18} aria-hidden /> Next letter
           </button>
         </section>
@@ -496,38 +466,38 @@ export default function IncomingApplication() {
         <form onSubmit={save} className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           {/* left: letter + fee */}
           <div className="space-y-6 lg:sticky lg:top-6 lg:self-start">
-            <section className="neu-raised p-4">
+            <section className="cc-card p-4">
               <div className="mb-3 flex items-center justify-between gap-2">
-                <h2 className="text-sm font-bold text-neu-text">Scan · ಸ್ಕ್ಯಾನ್ ಪ್ರತಿ</h2>
-                <button type="button" disabled={uploading} onClick={() => cameraRef.current?.click()} className="neu-raised-sm neu-press flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-neu-text disabled:opacity-60">
+                <h2 className="text-sm font-bold text-cc-text">Scan · ಸ್ಕ್ಯಾನ್ ಪ್ರತಿ</h2>
+                <button type="button" disabled={uploading} onClick={() => cameraRef.current?.click()} className="cc-chip cc-press flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-cc-text disabled:opacity-60">
                   {uploading ? <LoaderCircle size={14} className="animate-spin" aria-hidden /> : preview ? <RotateCcw size={14} aria-hidden /> : <Camera size={14} aria-hidden />}
                   {preview ? "Retake" : "Attach photo"}
                 </button>
               </div>
               {preview ? (
                 preview.isPdf ? (
-                  <iframe title="Scanned letter" src={preview.url} className="neu-inset h-[360px] w-full" />
+                  <iframe title="Scanned letter" src={preview.url} className="cc-field h-[360px] w-full" />
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={preview.url} alt="Scanned letter" className="neu-inset max-h-[460px] w-full object-contain p-2" />
+                  <img src={preview.url} alt="Scanned letter" className="cc-field max-h-[460px] w-full object-contain p-2" />
                 )
               ) : (
-                <div className="neu-inset flex h-24 items-center justify-center gap-2 text-sm text-neu-muted">
+                <div className="cc-field flex h-24 items-center justify-center gap-2 text-sm text-cc-muted">
                   <FileText size={18} aria-hidden /> No scan attached
                 </div>
               )}
               {notice && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900">{notice}</p>}
             </section>
 
-            <details className="neu-raised p-4">
-              <summary className="flex cursor-pointer items-center gap-2 text-sm font-bold text-neu-text">
+            <details className="cc-card p-4">
+              <summary className="flex cursor-pointer items-center gap-2 text-sm font-bold text-cc-text">
                 <Sparkles size={16} aria-hidden /> {letterText ? "Text read from the letter (edit and fill again)" : "Fill from letter text (Google Lens)"}
               </summary>
               <div className="mt-3">{pasteBox}</div>
             </details>
 
-            <section className="neu-raised p-5">
-              <h2 className="flex items-center gap-2 text-sm font-bold text-neu-text">
+            <section className="cc-card p-5">
+              <h2 className="flex items-center gap-2 text-sm font-bold text-cc-text">
                 <IndianRupee size={16} aria-hidden /> CCTEK fee · ಸಿಸಿಟೆಕ್ ಶುಲ್ಕ
               </h2>
               {shownCharges ? (
@@ -540,27 +510,27 @@ export default function IncomingApplication() {
                     ["TA", formatRupees(shownCharges.ta)],
                   ].map(([k, v]) => (
                     <div key={k} className="flex justify-between gap-4">
-                      <dt className="text-neu-muted">{k}</dt>
-                      <dd className="font-semibold tabular-nums text-neu-text">{v}</dd>
+                      <dt className="text-cc-muted">{k}</dt>
+                      <dd className="font-semibold tabular-nums text-cc-text">{v}</dd>
                     </div>
                   ))}
-                  <div className="neu-inset mt-3 grid grid-cols-2 gap-2 p-3 text-xs">
-                    <span className="text-neu-muted">Inspectors 45%</span><span className="text-right tabular-nums">{formatRupees(shownCharges.shares?.inspectors)}</span>
-                    <span className="text-neu-muted">Support 10%</span><span className="text-right tabular-nums">{formatRupees(shownCharges.shares?.support)}</span>
-                    <span className="text-neu-muted">Admin & infra 25%</span><span className="text-right tabular-nums">{formatRupees(shownCharges.shares?.admin_infra)}</span>
-                    <span className="text-neu-muted">Profit 20%</span><span className="text-right tabular-nums">{formatRupees(shownCharges.shares?.profit)}</span>
+                  <div className="cc-field mt-3 grid grid-cols-2 gap-2 p-3 text-xs">
+                    <span className="text-cc-muted">Inspectors 45%</span><span className="text-right tabular-nums">{formatRupees(shownCharges.shares?.inspectors)}</span>
+                    <span className="text-cc-muted">Support 10%</span><span className="text-right tabular-nums">{formatRupees(shownCharges.shares?.support)}</span>
+                    <span className="text-cc-muted">Admin & infra 25%</span><span className="text-right tabular-nums">{formatRupees(shownCharges.shares?.admin_infra)}</span>
+                    <span className="text-cc-muted">Profit 20%</span><span className="text-right tabular-nums">{formatRupees(shownCharges.shares?.profit)}</span>
                   </div>
                 </dl>
               ) : (
-                <p className="mt-3 text-sm text-neu-muted">Enter the bill amount to see the fee.</p>
+                <p className="mt-3 text-sm text-cc-muted">Enter the bill amount to see the fee.</p>
               )}
             </section>
           </div>
 
           {/* right: details */}
           <div className="space-y-6">
-            <section className="neu-raised space-y-5 p-5 sm:p-6">
-              <h2 className="text-sm font-bold text-neu-text">From · ಕಳುಹಿಸಿದವರು</h2>
+            <section className="cc-card space-y-5 p-5 sm:p-6">
+              <h2 className="text-sm font-bold text-cc-text">From · ಕಳುಹಿಸಿದವರು</h2>
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field label="Party" kn="ಕಳುಹಿಸಿದ ಸಂಸ್ಥೆ" flagged={flags.has("partyId")}>
                   <select required value={form.partyId} onChange={set("partyId")} className={inputCls(flags.has("partyId"))}>
@@ -596,8 +566,8 @@ export default function IncomingApplication() {
               </div>
             </section>
 
-            <section className="neu-raised space-y-5 p-5 sm:p-6">
-              <h2 className="text-sm font-bold text-neu-text">Work · ಕಾಮಗಾರಿ</h2>
+            <section className="cc-card space-y-5 p-5 sm:p-6">
+              <h2 className="text-sm font-bold text-cc-text">Work · ಕಾಮಗಾರಿ</h2>
               <Field label="Name of work" kn="ಕಾಮಗಾರಿಯ ಹೆಸರು" flagged={flags.has("appDetails")}>
                 <textarea rows={3} value={form.appDetails} onChange={set("appDetails")} className={inputCls(flags.has("appDetails"))} />
               </Field>
@@ -659,9 +629,9 @@ export default function IncomingApplication() {
                   </select>
                 </Field>
                 <div>
-                  <label className="mb-1.5 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-neu-muted">
+                  <label className="mb-1.5 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-cc-muted">
                     <input type="checkbox" checked={form.lumpsum} onChange={set("lumpsum")} className="h-4 w-4 accent-amber-600" /> Lumpsum fee
-                    <span className="text-[13px] font-semibold normal-case tracking-normal text-neu-text/70">ಒಟ್ಟು ಮೊತ್ತದ ಶುಲ್ಕ</span>
+                    <span className="text-[13px] font-semibold normal-case tracking-normal text-cc-text/70">ಒಟ್ಟು ಮೊತ್ತದ ಶುಲ್ಕ</span>
                   </label>
                   {form.lumpsum && (
                     <input type="number" min="0" step="0.01" required value={form.lumpsumFee} onChange={set("lumpsumFee")} placeholder="Fee in ₹" className={inputCls(false)} />
@@ -670,8 +640,8 @@ export default function IncomingApplication() {
               </div>
             </section>
 
-            <section className="neu-raised space-y-5 p-5 sm:p-6">
-              <h2 className="text-sm font-bold text-neu-text">Register entry · ನೋಂದಣಿ ವಿವರ</h2>
+            <section className="cc-card space-y-5 p-5 sm:p-6">
+              <h2 className="text-sm font-bold text-cc-text">Register entry · ನೋಂದಣಿ ವಿವರ</h2>
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
                 <Field label="App no." kn="ಅರ್ಜಿ ಸಂಖ್ಯೆ">
                   <input required value={form.appNo} onChange={set("appNo")} className={inputCls(false)} />
@@ -692,10 +662,10 @@ export default function IncomingApplication() {
             </section>
 
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <button type="button" onClick={reset} className="neu-raised-sm neu-press px-6 py-3.5 text-sm font-semibold text-neu-text">
+              <button type="button" onClick={reset} className="cc-chip cc-press px-6 py-3.5 text-sm font-semibold text-cc-text">
                 Cancel
               </button>
-              <button type="submit" disabled={saving || uploading} className="neu-primary neu-press flex items-center justify-center gap-2 px-6 py-3.5 text-sm disabled:opacity-60">
+              <button type="submit" disabled={saving || uploading} className="cc-btn-primary cc-press flex items-center justify-center gap-2 px-6 py-3.5 text-sm disabled:opacity-60">
                 {saving ? <LoaderCircle size={18} className="animate-spin" aria-hidden /> : <Save size={18} aria-hidden />}
                 {duplicate ? "Register anyway" : "Register application"}
               </button>
@@ -705,16 +675,16 @@ export default function IncomingApplication() {
       )}
 
       {recent.length > 0 && step !== "reading" && (
-        <section className="neu-raised p-5">
-          <h2 className="mb-3 text-sm font-bold text-neu-text">Registered by you recently</h2>
+        <section className="cc-card p-5">
+          <h2 className="mb-3 text-sm font-bold text-cc-text">Registered by you recently</h2>
           <ul className="divide-y divide-black/5">
             {recent.map((p) => (
               <li key={p._id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
                 <span className="min-w-0 truncate">
                   <span className="font-semibold">Sl. {p.serialNo}</span>
-                  <span className="text-neu-muted"> · App {p.appNo} · {p.party?.code} · {p.contractorName || "—"}</span>
+                  <span className="text-cc-muted"> · App {p.appNo} · {p.party?.code} · {p.contractorName || "—"}</span>
                 </span>
-                <span className="shrink-0 tabular-nums text-neu-muted">{formatRupees(p.projectBillAmount)}</span>
+                <span className="shrink-0 tabular-nums text-cc-muted">{formatRupees(p.projectBillAmount)}</span>
               </li>
             ))}
           </ul>

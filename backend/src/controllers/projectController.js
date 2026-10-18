@@ -11,7 +11,6 @@ import { ruleForDate } from "../models/BillingRule.js";
 import { nextSequence, financialYear } from "../models/Counter.js";
 import { audit } from "../models/AuditLog.js";
 import { calculateCharges, DEFAULT_RULE } from "../services/billingService.js";
-import { extractInwardLetter, extractionReady } from "../services/extractionService.js";
 import { storePrivately, signedViewUrl } from "../middlewares/uploadScan.js";
 import { hasPermission } from "../config/roles.js";
 import {
@@ -36,7 +35,7 @@ export const listParties = async (req, res) => {
 
 export const scanInward = async (req, res) => {
   const { buffer, originalname, size } = req.file;
-  const { mime, format } = req.fileType;
+  const { format } = req.fileType;
 
   const stored = await storePrivately(buffer, { folder: "cctek/inward", resourceType: "image" });
   const scan = await IntakeScan.create({
@@ -48,29 +47,8 @@ export const scanInward = async (req, res) => {
     originalName: String(originalname || "").slice(0, 120),
   });
 
-  let extracted = null;
-  let extractionError = "";
-  if (extractionReady()) {
-    try {
-      const parties = await Party.find({ isActive: true }).select("code name").lean();
-      const result = await extractInwardLetter(buffer, mime, parties);
-      extracted = result.data;
-      scan.model = result.model;
-      // Map the code the model picked to our party id (never trust a raw id from AI).
-      const party = parties.find((p) => p.code === String(extracted.partyCode || "").toUpperCase());
-      extracted.partyId = party ? String(party._id) : "";
-    } catch (err) {
-      console.error("Extraction failed:", err.message);
-      extractionError = "Could not read the letter automatically. Please fill in the details.";
-    }
-  } else {
-    extractionError = "Automatic reading is not set up. Please fill in the details.";
-  }
-  scan.extracted = extracted;
-  scan.extractionError = extractionError;
-  await scan.save();
-
-  res.status(201).json({ success: true, data: { scanId: scan._id, extracted, extractionError } });
+  // The letter is read in the browser (free OCR); the server only keeps the copy.
+  res.status(201).json({ success: true, data: { scanId: scan._id } });
 };
 
 export const getScanUrl = async (req, res) => {
@@ -374,6 +352,7 @@ export const changeStatus = async (req, res) => {
   if (!STATUS_FLOW[project.status]?.includes(to))
     throw new HttpError(409, `A job that is ${project.status.replace("_", " ")} can't be moved to ${to.replace("_", " ")}.`);
   if (["on_hold", "cancelled"].includes(to) && !note) throw new HttpError(400, "Please give a reason.");
+  if (project.bill) throw new HttpError(409, "This job is on a bill. Cancel the bill first.");
   if (to === "assigned" && !project.team.some((m) => m.role === "inspector")) throw new HttpError(400, "Assign the team first.");
 
   if (to === "inspected") {

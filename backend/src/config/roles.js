@@ -7,7 +7,7 @@
  * work_coordinator - Technical work allocation and supervision
  * faculty          - Assigned technical work
  * accounts         - Billing, receipts and payment records
- * approver         - Authorized financial/work approvals
+ * approver         - Principal: approves remuneration statements
  * auditor          - Read-only review
  */
 
@@ -18,7 +18,7 @@ export const ROLE_LABELS = {
   work_coordinator: "Work Coordinator",
   faculty: "College Staff / Faculty",
   accounts: "Accounts and Billing Staff",
-  approver: "Authorized Approver",
+  approver: "Principal / Approver",
   auditor: "Auditor / Read-only Reviewer",
 };
 
@@ -46,10 +46,17 @@ export const normalizeRole = (role) => {
 
 // Role checks must be enforced by backend middleware/controllers.
 // Hiding a frontend menu is not an authorization mechanism.
+// Who does what in billing:
+//   Work coordinator / office staff: make bills, record cheques, prepare the
+//     monthly remuneration statement.
+//   Principal (approver) / Manager: approve statements, see the overview.
+//   Nobody approves a statement they prepared (checked in the controller).
 export const ROLE_PERMISSIONS = {
   admin: [
     "users.manage",
     "settings.manage",
+    "parties.manage",
+    "rules.manage",
     "projects.read",
     "projects.create",
     "projects.update",
@@ -57,10 +64,8 @@ export const ROLE_PERMISSIONS = {
     "assignments.manage",
     "billing.read",
     "billing.prepare",
-    "billing.approve",
     "receipts.manage",
-    "parties.manage",
-    "rules.manage",
+    "payouts.read",
     "payouts.prepare",
     "payouts.approve",
     "reports.read",
@@ -68,6 +73,8 @@ export const ROLE_PERMISSIONS = {
   ],
 
   manager: [
+    "settings.manage",
+    "parties.manage",
     "projects.read",
     "projects.create",
     "projects.update",
@@ -76,7 +83,10 @@ export const ROLE_PERMISSIONS = {
     "assignments.manage",
     "billing.read",
     "billing.prepare",
-    "receipts.read",
+    "receipts.manage",
+    "payouts.read",
+    "payouts.prepare",
+    "payouts.approve",
     "reports.read",
   ],
 
@@ -87,7 +97,10 @@ export const ROLE_PERMISSIONS = {
     "documents.manage",
     "correspondence.manage",
     "billing.read",
-    "receipts.read",
+    "billing.prepare",
+    "receipts.manage",
+    "payouts.read",
+    "payouts.prepare",
   ],
 
   work_coordinator: [
@@ -95,6 +108,11 @@ export const ROLE_PERMISSIONS = {
     "assignments.read",
     "assignments.manage",
     "documents.manage",
+    "billing.read",
+    "billing.prepare",
+    "receipts.manage",
+    "payouts.read",
+    "payouts.prepare",
     "reports.read",
   ],
 
@@ -111,6 +129,7 @@ export const ROLE_PERMISSIONS = {
     "billing.read",
     "billing.prepare",
     "receipts.manage",
+    "payouts.read",
     "payouts.prepare",
     "reports.read",
   ],
@@ -119,7 +138,7 @@ export const ROLE_PERMISSIONS = {
     "projects.read",
     "assignments.read",
     "billing.read",
-    "billing.approve",
+    "payouts.read",
     "payouts.approve",
     "reports.read",
   ],
@@ -128,11 +147,13 @@ export const ROLE_PERMISSIONS = {
     "projects.read",
     "assignments.read",
     "billing.read",
-    "receipts.read",
+    "payouts.read",
     "reports.read",
     "audit.read",
   ],
 };
+
+export const permissionsFor = (role) => ROLE_PERMISSIONS[normalizeRole(role)] || [];
 
 export const hasPermission = (role, permission) => {
   const normalized = normalizeRole(role);

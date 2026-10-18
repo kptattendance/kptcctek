@@ -23,7 +23,7 @@ const TABS = [
 ];
 
 function TeamStack({ team }) {
-  if (!team?.length) return <span className="text-neu-muted">—</span>;
+  if (!team?.length) return <span className="text-cc-muted">—</span>;
   return (
     <span className="flex items-center" title={team.map((m) => `${m.user?.name} (${m.role})`).join(", ")}>
       {team.slice(0, 3).map((m, i) => (
@@ -31,7 +31,7 @@ function TeamStack({ team }) {
           <Avatar name={m.user?.name || "?"} src={m.user?.imageUrl} size={28} />
         </span>
       ))}
-      {team.length > 3 && <span className="ml-1 text-xs font-bold text-neu-muted">+{team.length - 3}</span>}
+      {team.length > 3 && <span className="ml-1 text-xs font-bold text-cc-muted">+{team.length - 3}</span>}
     </span>
   );
 }
@@ -76,19 +76,19 @@ export default function CoordinatorPage() {
   function primaryAction(p) {
     if (["received", "on_hold"].includes(p.status))
       return (
-        <button type="button" onClick={stop(() => setAssigning(p))} className="neu-primary neu-press flex items-center gap-1.5 px-3 py-1.5 text-sm">
+        <button type="button" onClick={stop(() => setAssigning(p))} className="cc-btn-primary cc-press flex items-center gap-1.5 px-3 py-1.5 text-sm">
           <UsersRound size={15} aria-hidden /> Assign
         </button>
       );
     if (p.status === "assigned")
       return (
-        <button type="button" onClick={stop(() => setAction({ project: p, to: "inspected" }))} className="neu-raised-sm neu-press flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold">
+        <button type="button" onClick={stop(() => setAction({ project: p, to: "inspected" }))} className="cc-chip cc-press flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold">
           <ClipboardCheck size={15} aria-hidden /> Inspected
         </button>
       );
     if (p.status === "inspected")
       return (
-        <button type="button" onClick={stop(() => setAction({ project: p, to: "report_issued" }))} className="neu-primary neu-press flex items-center gap-1.5 px-3 py-1.5 text-sm">
+        <button type="button" onClick={stop(() => setAction({ project: p, to: "report_issued" }))} className="cc-btn-primary cc-press flex items-center gap-1.5 px-3 py-1.5 text-sm">
           <FileCheck2 size={15} aria-hidden /> Report
         </button>
       );
@@ -97,11 +97,11 @@ export default function CoordinatorPage() {
 
   // Everything allowed for this job, in the details panel.
   function allActions(p) {
-    const btn = "neu-raised-sm neu-press flex items-center gap-2 px-4 py-2 text-sm font-semibold";
+    const btn = "cc-chip cc-press flex items-center gap-2 px-4 py-2 text-sm font-semibold";
     return (
       <>
         {["received", "assigned", "on_hold"].includes(p.status) && (
-          <button type="button" onClick={() => setAssigning(p)} className="neu-primary neu-press flex items-center gap-2 px-4 py-2 text-sm">
+          <button type="button" onClick={() => setAssigning(p)} className="cc-btn-primary cc-press flex items-center gap-2 px-4 py-2 text-sm">
             <UsersRound size={16} aria-hidden /> {p.team?.length ? "Change team" : "Assign team"}
           </button>
         )}
@@ -111,7 +111,7 @@ export default function CoordinatorPage() {
           </button>
         )}
         {p.status === "inspected" && (
-          <button type="button" onClick={() => setAction({ project: p, to: "report_issued" })} className="neu-primary neu-press flex items-center gap-2 px-4 py-2 text-sm">
+          <button type="button" onClick={() => setAction({ project: p, to: "report_issued" })} className="cc-btn-primary cc-press flex items-center gap-2 px-4 py-2 text-sm">
             <FileCheck2 size={16} aria-hidden /> Report issued
           </button>
         )}
@@ -121,12 +121,12 @@ export default function CoordinatorPage() {
           </button>
         )}
         {["received", "assigned", "inspected"].includes(p.status) && (
-          <button type="button" onClick={() => setAction({ project: p, to: "on_hold" })} className={`${btn} text-neu-warn`}>
+          <button type="button" onClick={() => setAction({ project: p, to: "on_hold" })} className={`${btn} text-cc-warn`}>
             <PauseCircle size={16} aria-hidden /> Hold
           </button>
         )}
         {["received", "assigned", "on_hold"].includes(p.status) && (
-          <button type="button" onClick={() => setAction({ project: p, to: "cancelled" })} className={`${btn} text-neu-bad`}>
+          <button type="button" onClick={() => setAction({ project: p, to: "cancelled" })} className={`${btn} text-cc-bad`}>
             <XCircle size={16} aria-hidden /> Cancel
           </button>
         )}
@@ -156,7 +156,7 @@ export default function CoordinatorPage() {
       render: (p) => (
         <span>
           <TeamStack team={p.team} />
-          {tab === "inspect" && p.plannedInspectionDate && <span className="block text-xs text-neu-muted">visit {fmtDate(p.plannedInspectionDate)}</span>}
+          {tab === "inspect" && p.plannedInspectionDate && <span className="block text-xs text-cc-muted">visit {fmtDate(p.plannedInspectionDate)}</span>}
         </span>
       ),
     },
@@ -176,7 +176,7 @@ export default function CoordinatorPage() {
     <div className="mx-auto max-w-[1400px] space-y-5">
       <header>
         <h1 className="text-2xl font-extrabold">Assign & track</h1>
-        <p className="text-sm text-neu-muted">ನಿಯೋಜನೆ ಮತ್ತು ಅನುಸರಣೆ · Oldest first. Tap a row for details and all actions.</p>
+        <p className="text-sm text-cc-muted">ನಿಯೋಜನೆ ಮತ್ತು ಅನುಸರಣೆ · Oldest first. Tap a row for details and all actions.</p>
       </header>
 
       <StatusTabs tabs={TABS} value={tab} onChange={setTab} counts={counts} />
@@ -206,11 +206,11 @@ export default function CoordinatorPage() {
           emptyText={tab === "assign" ? "Nothing to assign. New applications from the office appear here." : "Nothing here."}
         />
 
-        <aside className="neu-raised h-fit p-4">
+        <aside className="cc-card h-fit p-4">
           <h2 className="text-sm font-bold">Open jobs per person</h2>
-          <p className="text-xs text-neu-muted">ಬಾಕಿ ಕೆಲಸ · click to filter</p>
+          <p className="text-xs text-cc-muted">ಬಾಕಿ ಕೆಲಸ · click to filter</p>
           {summary.workload.length === 0 ? (
-            <p className="mt-3 text-sm text-neu-muted">No open jobs.</p>
+            <p className="mt-3 text-sm text-cc-muted">No open jobs.</p>
           ) : (
             <ul className="mt-3 grid gap-2 sm:grid-cols-2 2xl:grid-cols-1">
               {summary.workload.map((w) => (
@@ -219,7 +219,7 @@ export default function CoordinatorPage() {
                     type="button"
                     onClick={() => list.setFilter("member", list.filters.member === w.user._id ? "" : w.user._id)}
                     aria-pressed={list.filters.member === w.user._id}
-                    className={`flex w-full items-center gap-2 px-2 py-1.5 text-left ${list.filters.member === w.user._id ? "neu-inset" : "neu-press rounded-xl"}`}
+                    className={`flex w-full items-center gap-2 px-2 py-1.5 text-left ${list.filters.member === w.user._id ? "rounded-[10px] border border-cc-primary/40 bg-cc-primary-soft text-cc-primary" : "cc-press rounded-xl hover:bg-cc-subtle"}`}
                   >
                     <Avatar name={w.user.name} src={w.user.imageUrl} size={28} />
                     <span className="min-w-0 flex-1 truncate text-sm font-semibold">{w.user.name}</span>

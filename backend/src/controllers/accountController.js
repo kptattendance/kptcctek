@@ -15,10 +15,11 @@ import User, { DESIGNATIONS, DEPARTMENTS, normalizeDesignation } from "../models
 import Project from "../models/Project.js";
 import Bill from "../models/Bill.js";
 import Receipt from "../models/Receipt.js";
-import Payout from "../models/Payout.js";
+import RemunerationStatement from "../models/RemunerationStatement.js";
+import Distribution from "../models/Distribution.js";
 import IntakeScan from "../models/IntakeScan.js";
 import AuditLog, { audit } from "../models/AuditLog.js";
-import { ROLES, ROLE_LABELS } from "../config/roles.js";
+import { ROLES, ROLE_LABELS, permissionsFor } from "../config/roles.js";
 import { storeAvatar, destroyAvatar } from "../middlewares/uploadAvatar.js";
 import { HttpError, str, email, oneOf, bool, compact, objectId, escapeRegex, paging } from "../utils/validate.js";
 
@@ -87,7 +88,7 @@ export const getOptions = async (req, res) => {
 
 export const getMe = async (req, res) => {
   const user = await User.findById(req.user.dbId).select(PUBLIC_FIELDS).lean();
-  res.json({ success: true, data: shape(user) });
+  res.json({ success: true, data: { ...shape(user), permissions: permissionsFor(user.role) } });
 };
 
 export const listUsers = async (req, res) => {
@@ -239,9 +240,12 @@ async function workHistory(uid) {
   const t = mongoose.trusted;
   const [projects, bills, receipts, payouts, scans, actions] = await Promise.all([
     Project.countDocuments(t({ $or: [{ createdBy: uid }, { "team.user": uid }] })),
-    Bill.countDocuments(t({ $or: [{ preparedBy: uid }, { approvedBy: uid }] })),
+    Bill.countDocuments(t({ $or: [{ createdBy: uid }, { issuedBy: uid }] })),
     Receipt.countDocuments({ recordedBy: uid }),
-    Payout.countDocuments(t({ $or: [{ preparedBy: uid }, { "people.user": uid }] })),
+    Promise.all([
+      RemunerationStatement.countDocuments(t({ $or: [{ preparedBy: uid }, { approvedBy: uid }] })),
+      Distribution.countDocuments({ "people.user": uid }),
+    ]).then(([a, b]) => a + b),
     IntakeScan.countDocuments({ uploadedBy: uid }),
     AuditLog.countDocuments({ actor: uid }),
   ]);

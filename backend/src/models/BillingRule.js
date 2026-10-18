@@ -31,9 +31,7 @@ const billingRuleSchema = new mongoose.Schema(
     gstPercent: { type: Number, default: 18, min: 0, max: 100 },
     taPerKm: { type: Number, default: 1500, min: 0 }, // paise
     shares: [percentPart],
-    profitSplit: [percentPart],
-    // How the CCTEK share is used (Reserve 10%, Student Welfare 15%, ...)
-    fundAllocation: [percentPart],
+    profitSplit: [percentPart], // heads of the balance (DTE, Reserve, Student Welfare, ...)
     isActive: { type: Boolean, default: true },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
@@ -51,6 +49,10 @@ export function ruleForDate(date = new Date()) {
   return BillingRule.findOne({ isActive: true, effectiveFrom: mongoose.trusted({ $lte: date }) })
     .sort({ effectiveFrom: -1 })
     .lean();
+}
+
+export function ruleByCode(code) {
+  return BillingRule.findOne({ code: String(code || "") }).lean();
 }
 
 export default BillingRule;

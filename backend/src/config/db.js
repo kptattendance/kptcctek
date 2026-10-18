@@ -31,7 +31,23 @@ const connectDB = async () => {
   }
 
   cached.conn = await cached.promise;
+  if (!cached.collections) cached.collections = ensureCollections().catch((err) => {
+    cached.collections = null;
+    console.error("Could not create collections:", err.message);
+  });
+  await cached.collections;
   return cached.conn;
 };
+
+// MongoDB Atlas refuses to create a collection inside a transaction
+// ("Error determining if update will go over space quota"). Bills, receipts
+// and distributions are written in transactions, so make sure every model's
+// collection exists before the first request is handled.
+export async function ensureCollections() {
+  const existing = new Set((await mongoose.connection.db.listCollections({}, { nameOnly: true }).toArray()).map((c) => c.name));
+  for (const model of Object.values(mongoose.models)) {
+    if (!existing.has(model.collection.collectionName)) await model.createCollection();
+  }
+}
 
 export default connectDB;

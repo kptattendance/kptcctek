@@ -133,7 +133,7 @@ Security middleware, allow-list auth, permissions, models, billing engine (verif
 - Users screens wired to `GET/POST/PATCH /api/users`.
 
 ### Step 3: Projects (register)
-**Partly done:** inward scan → AI extraction (Claude, `ANTHROPIC_API_KEY`) → staff review → save, at `/office/incoming` (and `/admin/projects/new`); register list at `/office/register`. Scans are stored as private Cloudinary assets, viewed through 5-minute signed links. Still to do: edit, assign team, status changes.
+**Partly done:** inward scan → free in-browser OCR (Tesseract, Kannada + English) → staff review → save, at `/office/incoming` (and `/admin/projects/new`); register list at `/office/register`. Scans are stored as private Cloudinary assets, viewed through 5-minute signed links. Still to do: edit, assign team, status changes.
 
 - Backend `projectController/projectRoutes`:
   - `POST /api/projects` (projects.create): serial from `Counter`, `gstMode` from party, charges calculated with `ruleForDate(appDate)`.

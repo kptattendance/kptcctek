@@ -10,7 +10,11 @@
 //   TA                 T = KM * 15
 //   AMOUNT             U = R - T
 //   shares             V/W/X/Y = U * 45% / 10% / 25% / 20%  (from the rule)
-//   profit split       Z/AA = Y * 25% (DTE) / 75% (CCTEK)
+//   balance split      the 20% balance is shared out as in the monthly
+//                      "Resource Persons Remuneration Bill" sheets:
+//                      DTE 25, Reserve 10, Student Welfare 15, Staff Welfare 18,
+//                      Infrastructure 20, WID 5, Environment 2, R&M 2,
+//                      Contingencies 3  (% of the balance, total 100)
 //
 // The percentages live in a BillingRule document, so a change in policy
 // (e.g. 2024-25 used 42/10/3/5/20) is a new rule, never a code change, and
@@ -31,12 +35,19 @@ export const DEFAULT_RULE = {
     { key: "inspectors", label: "Resource Person Remuneration", percent: 45, payTo: "inspectors" },
     { key: "support", label: "Support / Accompanying Staff", percent: 10, payTo: "support" },
     { key: "admin_infra", label: "Administrative & Infrastructure", percent: 25, payTo: "fund" },
-    { key: "profit", label: "CCTEK Profit", percent: 20, payTo: "profit" },
+    { key: "profit", label: "Balance (allocation of funds)", percent: 20, payTo: "profit" },
   ],
-  // Split of the "profit" share. Must total 100.
+  // Split of the balance ("profit") share. Must total 100.
   profitSplit: [
     { key: "dte", label: "DTE Share", percent: 25 },
-    { key: "cctek", label: "CCTEK Share", percent: 75 },
+    { key: "reserve", label: "Reserve", percent: 10 },
+    { key: "student_welfare", label: "Student Welfare", percent: 15 },
+    { key: "staff_welfare", label: "Staff Welfare", percent: 18 },
+    { key: "infrastructure", label: "Infrastructure", percent: 20 },
+    { key: "wid", label: "WID", percent: 5 },
+    { key: "environment", label: "Environment", percent: 2 },
+    { key: "repair", label: "Repair & Maintenance", percent: 2 },
+    { key: "contingency", label: "Contingencies", percent: 3 },
   ],
 };
 
@@ -52,7 +63,7 @@ export function serviceChargePercent(projectBillPaise, rule = DEFAULT_RULE) {
 // Split `total` paise by percentages so the parts always add back to total
 // (largest-remainder method; Excel rounds each part independently and can be
 // off by a paisa, we can't be).
-function splitExact(total, parts) {
+export function splitExact(total, parts) {
   const raw = parts.map((p) => (total * p.percent) / 100);
   const floored = raw.map(Math.floor);
   let left = total - floored.reduce((a, b) => a + b, 0);

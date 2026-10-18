@@ -15,14 +15,14 @@ const EMPTY = { name: "", email: "", phone: "", role: "faculty", department: "",
 const MAX_PHOTO = 3 * 1024 * 1024;
 
 const inputCls =
-  "neu-inset w-full px-4 py-3 text-sm text-neu-text outline-none placeholder:text-neu-muted/70 focus-visible:ring-2 focus-visible:ring-neu-accent disabled:opacity-60";
+  "cc-field w-full px-4 py-3 text-sm text-cc-text outline-none placeholder:text-cc-muted/70 focus-visible:ring-2 focus-visible:ring-cc-primary disabled:opacity-60";
 
 function Field({ label, children, hint }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-neu-muted">{label}</span>
+      <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-cc-muted">{label}</span>
       {children}
-      {hint && <span className="mt-1 block text-xs text-neu-muted">{hint}</span>}
+      {hint && <span className="mt-1 block text-xs text-cc-muted">{hint}</span>}
     </label>
   );
 }
@@ -129,19 +129,19 @@ export default function UserForm({ userId }) {
   if (loading) {
     return (
       <div className="flex justify-center p-16">
-        <LoaderCircle className="animate-spin text-neu-accent" aria-label="Loading" />
+        <LoaderCircle className="animate-spin text-cc-primary" aria-label="Loading" />
       </div>
     );
   }
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <Link href="/admin/users" className="inline-flex items-center gap-2 text-sm font-semibold text-neu-muted hover:text-neu-text">
+      <Link href="/admin/users" className="inline-flex items-center gap-2 text-sm font-semibold text-cc-muted hover:text-cc-text">
         <ArrowLeft size={16} aria-hidden /> All users
       </Link>
       <header>
-        <h1 className="text-2xl font-extrabold text-neu-text">{editing ? "Edit user" : "Add user"}</h1>
-        <p className="mt-1 text-sm text-neu-muted">
+        <h1 className="text-2xl font-extrabold text-cc-text">{editing ? "Edit user" : "Add user"}</h1>
+        <p className="mt-1 text-sm text-cc-muted">
           {editing
             ? "Changes are saved to CCTEK and to the person's Clerk login."
             : "Creates the person's Clerk login and CCTEK record. They sign in with Google using this email; no password or OTP."}
@@ -150,18 +150,18 @@ export default function UserForm({ userId }) {
 
 
       <form onSubmit={submit} className="space-y-6">
-        <section className="neu-raised flex flex-col items-center gap-5 p-6 sm:flex-row">
+        <section className="cc-card flex flex-col items-center gap-5 p-6 sm:flex-row">
           <Avatar name={form.name} src={shownPhoto} size={104} />
           <div className="text-center sm:text-left">
-            <h2 className="text-sm font-bold text-neu-text">Profile photo</h2>
-            <p className="mt-1 text-xs text-neu-muted">JPG, PNG or WEBP, up to 3 MB. Cropped to a square around the face.</p>
+            <h2 className="text-sm font-bold text-cc-text">Profile photo</h2>
+            <p className="mt-1 text-xs text-cc-muted">JPG, PNG or WEBP, up to 3 MB. Cropped to a square around the face.</p>
             <input ref={photoRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={pickPhoto} />
             <div className="mt-3 flex flex-wrap justify-center gap-3 sm:justify-start">
-              <button type="button" onClick={() => photoRef.current?.click()} className="neu-raised-sm neu-press flex items-center gap-2 px-4 py-2 text-sm font-semibold text-neu-text">
+              <button type="button" onClick={() => photoRef.current?.click()} className="cc-chip cc-press flex items-center gap-2 px-4 py-2 text-sm font-semibold text-cc-text">
                 <Camera size={16} aria-hidden /> {shownPhoto ? "Change photo" : "Add photo"}
               </button>
               {shownPhoto && (
-                <button type="button" onClick={clearPhoto} className="neu-raised-sm neu-press flex items-center gap-2 px-4 py-2 text-sm font-semibold text-neu-bad">
+                <button type="button" onClick={clearPhoto} className="cc-chip cc-press flex items-center gap-2 px-4 py-2 text-sm font-semibold text-cc-bad">
                   <Trash2 size={16} aria-hidden /> Remove
                 </button>
               )}
@@ -169,7 +169,7 @@ export default function UserForm({ userId }) {
           </div>
         </section>
 
-        <section className="neu-raised grid gap-5 p-6 sm:grid-cols-2">
+        <section className="cc-card grid gap-5 p-6 sm:grid-cols-2">
           <Field label="Full name">
             <input required maxLength={120} value={form.name} onChange={set("name")} className={inputCls} />
           </Field>
@@ -184,7 +184,7 @@ export default function UserForm({ userId }) {
           </Field>
         </section>
 
-        <section className="neu-raised grid gap-5 p-6 sm:grid-cols-3">
+        <section className="cc-card grid gap-5 p-6 sm:grid-cols-3">
           <Field label="Role">
             <select required value={form.role} onChange={set("role")} className={inputCls}>
               {options.roles.map((r) => (
@@ -211,22 +211,22 @@ export default function UserForm({ userId }) {
           {editing && (
             <label className="flex items-center gap-3 sm:col-span-3">
               <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="h-5 w-5 accent-amber-600" />
-              <span className="text-sm font-semibold text-neu-text">Active</span>
-              <span className="text-xs text-neu-muted">Unticking blocks sign-in immediately (also banned in Clerk).</span>
+              <span className="text-sm font-semibold text-cc-text">Active</span>
+              <span className="text-xs text-cc-muted">Unticking blocks sign-in immediately (also banned in Clerk).</span>
             </label>
           )}
         </section>
 
-        <p className="flex items-start gap-2 text-xs text-neu-muted">
+        <p className="flex items-start gap-2 text-xs text-cc-muted">
           <Info size={14} className="mt-0.5 shrink-0" aria-hidden />
           Permissions come from the role here, not from Clerk. Changing the role takes effect on the person&apos;s next action.
         </p>
 
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <Link href="/admin/users" className="neu-raised-sm neu-press px-6 py-3.5 text-center text-sm font-semibold text-neu-text">
+          <Link href="/admin/users" className="cc-chip cc-press px-6 py-3.5 text-center text-sm font-semibold text-cc-text">
             Cancel
           </Link>
-          <button type="submit" disabled={saving} className="neu-primary neu-press flex items-center justify-center gap-2 px-6 py-3.5 text-sm disabled:opacity-60">
+          <button type="submit" disabled={saving} className="cc-btn-primary cc-press flex items-center justify-center gap-2 px-6 py-3.5 text-sm disabled:opacity-60">
             {saving ? <LoaderCircle size={18} className="animate-spin" aria-hidden /> : <Save size={18} aria-hidden />}
             {editing ? "Save changes" : "Add user"}
           </button>

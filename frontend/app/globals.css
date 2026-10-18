@@ -1,101 +1,141 @@
 @import "tailwindcss";
 
 /*
-  CCTEK neumorphism.
-  Surfaces share the page colour and get depth from two shadows: a light
-  one up-left and a dark one down-right. Keep text contrast high: soft UI
-  fails accessibility when labels are also "soft", so text stays dark and
-  status always has a colour + word, never shadow alone.
+  CCTEK theme: flat and modern.
+  Brand = deep teal (primary actions, sidebar) + amber (the "CC" mark,
+  highlights). White cards with a thin border on a cool grey page. Status is
+  always colour + word. Light only, so every screen looks the same.
+
+  Building blocks (use these, not one-off colours):
+    cc-card         panel / table container
+    cc-chip         small bordered button, badge, icon button
+    cc-field        input, select, search box
+    cc-btn-primary  main action (one per screen area)
+    cc-btn          secondary action
+    cc-press        hover / pressed / keyboard focus behaviour
 */
 :root {
-  --neu-bg: #e8ebf0;
-  --neu-light: #ffffff;
-  --neu-dark: #c3c9d4;
-  --neu-text: #1f2937;
-  --neu-muted: #5b6475;
-  --neu-accent: #d97706; /* CCTEK amber */
-  --neu-accent-ink: #1f1300;
-  --neu-ok: #047857;
-  --neu-warn: #b45309;
-  --neu-bad: #b91c1c;
-  --neu-radius: 18px;
-  --neu-distance: 6px;
-  --neu-blur: 14px;
-}
-
-/* Light theme only: the header and sidebar are light, so following the
-   computer's dark mode made the page half dark, half white. */
-:root {
   color-scheme: light;
+  --cc-bg: #f4f7f7;
+  --cc-surface: #ffffff;
+  --cc-subtle: #f8fafa;
+  --cc-border: #e1e8e8;
+  --cc-border-strong: #c5d3d3;
+  --cc-text: #0f1f1f;
+  --cc-muted: #5b6b6b;
+  --cc-primary: #0f766e;
+  --cc-primary-hover: #115e59;
+  --cc-primary-soft: #e6f4f2;
+  --cc-sidebar: #0b3534;
+  --cc-sidebar-hover: #12504d;
+  --cc-accent: #f59e0b;
+  --cc-accent-soft: #fef3c7;
+  --cc-ok: #047857;
+  --cc-warn: #b45309;
+  --cc-bad: #b91c1c;
+  --cc-radius: 14px;
+  --cc-shadow: 0 1px 2px rgb(15 31 31 / 0.05), 0 1px 1px rgb(15 31 31 / 0.03);
 }
 
 @theme inline {
-  --color-neu: var(--neu-bg);
-  --color-neu-text: var(--neu-text);
-  --color-neu-muted: var(--neu-muted);
-  --color-neu-accent: var(--neu-accent);
-  --color-neu-ok: var(--neu-ok);
-  --color-neu-warn: var(--neu-warn);
-  --color-neu-bad: var(--neu-bad);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-cc-bg: var(--cc-bg);
+  --color-cc-surface: var(--cc-surface);
+  --color-cc-subtle: var(--cc-subtle);
+  --color-cc-border: var(--cc-border);
+  --color-cc-text: var(--cc-text);
+  --color-cc-muted: var(--cc-muted);
+  --color-cc-primary: var(--cc-primary);
+  --color-cc-primary-hover: var(--cc-primary-hover);
+  --color-cc-primary-soft: var(--cc-primary-soft);
+  --color-cc-sidebar: var(--cc-sidebar);
+  --color-cc-sidebar-hover: var(--cc-sidebar-hover);
+  --color-cc-accent: var(--cc-accent);
+  --color-cc-accent-soft: var(--cc-accent-soft);
+  --color-cc-ok: var(--cc-ok);
+  --color-cc-warn: var(--cc-warn);
+  --color-cc-bad: var(--cc-bad);
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
-  background: var(--neu-bg);
-  color: var(--neu-text);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--cc-bg);
+  color: var(--cc-text);
+  font-family: var(--font-sans);
 }
 
-/* Raised card / panel */
-@utility neu-raised {
-  background: var(--neu-bg);
-  border-radius: var(--neu-radius);
-  box-shadow:
-    var(--neu-distance) var(--neu-distance) var(--neu-blur) var(--neu-dark),
-    calc(var(--neu-distance) * -1) calc(var(--neu-distance) * -1) var(--neu-blur) var(--neu-light);
+@utility cc-card {
+  background: var(--cc-surface);
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius);
+  box-shadow: var(--cc-shadow);
 }
 
-/* Small raised element: buttons, chips */
-@utility neu-raised-sm {
-  background: var(--neu-bg);
-  border-radius: 12px;
-  box-shadow:
-    3px 3px 7px var(--neu-dark),
-    -3px -3px 7px var(--neu-light);
+@utility cc-chip {
+  background: var(--cc-surface);
+  border: 1px solid var(--cc-border);
+  border-radius: 10px;
 }
 
-/* Pressed-in: inputs, search boxes, active tab, pressed button */
-@utility neu-inset {
-  background: var(--neu-bg);
-  border-radius: 12px;
-  box-shadow:
-    inset 3px 3px 7px var(--neu-dark),
-    inset -3px -3px 7px var(--neu-light);
+@utility cc-field {
+  background: var(--cc-surface);
+  border: 1px solid var(--cc-border-strong);
+  border-radius: 10px;
+  &:focus-within,
+  &:focus {
+    border-color: var(--cc-primary);
+    box-shadow: 0 0 0 3px rgb(15 118 110 / 0.15);
+    outline: none;
+  }
 }
 
-/* Primary action: solid accent so it is obvious, not just a shadow */
-@utility neu-primary {
-  background: var(--neu-accent);
-  color: var(--neu-accent-ink);
-  border-radius: 12px;
-  font-weight: 700;
-  box-shadow:
-    3px 3px 7px var(--neu-dark),
-    -3px -3px 7px var(--neu-light);
+@utility cc-btn-primary {
+  background: var(--cc-primary);
+  color: #ffffff;
+  border: 1px solid var(--cc-primary);
+  border-radius: 10px;
+  font-weight: 600;
+  &:hover:not(:disabled) {
+    background: var(--cc-primary-hover);
+  }
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
 }
 
-@utility neu-press {
-  transition: box-shadow 150ms ease, transform 150ms ease;
-  &:active {
+@utility cc-btn {
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  border: 1px solid var(--cc-border-strong);
+  border-radius: 10px;
+  font-weight: 600;
+  &:hover:not(:disabled) {
+    background: var(--cc-subtle);
+    border-color: var(--cc-primary);
+  }
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+@utility cc-press {
+  transition: background-color 150ms ease, border-color 150ms ease, transform 100ms ease;
+  &:active:not(:disabled) {
     transform: translateY(1px);
-    box-shadow:
-      inset 3px 3px 7px var(--neu-dark),
-      inset -3px -3px 7px var(--neu-light);
   }
   &:focus-visible {
-    outline: 3px solid var(--neu-accent);
-    outline-offset: 3px;
+    outline: 3px solid rgb(15 118 110 / 0.45);
+    outline-offset: 2px;
+  }
+}
+
+@media print {
+  body {
+    background: #ffffff;
+  }
+  .no-print {
+    display: none !important;
   }
 }
 

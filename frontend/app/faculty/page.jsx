@@ -52,7 +52,7 @@ export default function FacultyPage() {
           e.stopPropagation();
           setMarking(p);
         }}
-        className={`neu-primary neu-press flex items-center gap-1.5 text-sm ${compact ? "px-3 py-1.5" : "px-4 py-2"}`}
+        className={`cc-btn-primary cc-press flex items-center gap-1.5 text-sm ${compact ? "px-3 py-1.5" : "px-4 py-2"}`}
       >
         <ClipboardCheck size={15} aria-hidden /> {compact ? "Inspected" : "Mark inspected"}
       </button>
@@ -85,7 +85,7 @@ export default function FacultyPage() {
     <div className="mx-auto max-w-7xl space-y-5">
       <header>
         <h1 className="text-2xl font-extrabold">My inspections</h1>
-        <p className="text-sm text-neu-muted">ನನ್ನ ತಪಾಸಣೆಗಳು · Jobs you are on. Tap a row for full details and the scanned letter.</p>
+        <p className="text-sm text-cc-muted">ನನ್ನ ತಪಾಸಣೆಗಳು · Jobs you are on. Tap a row for full details and the scanned letter.</p>
       </header>
 
       <StatusTabs tabs={TABS} value={tab} onChange={setTab} counts={counts} />

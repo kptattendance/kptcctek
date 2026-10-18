@@ -1,7 +1,10 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "sonner";
 import Navbar from "./components/Navbar";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
+
+const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakarta", display: "swap" });
 
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
@@ -85,7 +88,7 @@ export const metadata = {
 export const viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#fbbf24",
+  themeColor: "#0b3534",
 };
 
 export default function RootLayout({ children }) {
@@ -97,10 +100,12 @@ export default function RootLayout({ children }) {
       signUpForceRedirectUrl="/auth/check"
       afterSignOutUrl="/"
     >
-      <html lang="en">
-        <body className="min-h-screen bg-white text-slate-800 antialiased">
+      <html lang="en" className={jakarta.variable}>
+        <body className="min-h-screen bg-cc-bg text-cc-text antialiased">
           <Toaster position="top-center" richColors closeButton expand toastOptions={{ style: { fontSize: "14px" } }} />
-          <Navbar />
+          <div className="no-print">
+            <Navbar />
+          </div>
           <main>{children}</main>
         </body>
       </html>

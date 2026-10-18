@@ -14,13 +14,16 @@ export function useProjectList(baseParams, defaultSort = { key: "serialNo", dir:
   const api = useApi();
   const [filters, setFilters] = useState({});
   const [sort, setSort] = useState(defaultSort);
-  const [page, setPage] = useState(1);
+  // Page is remembered per tab (base params): switching tab starts at page 1.
+  const baseKey = JSON.stringify(baseParams);
+  const [pageState, setPageState] = useState({ key: baseKey, page: 1 });
+  const page = pageState.key === baseKey ? pageState.page : 1;
+  const setPage = useCallback((p) => setPageState({ key: baseKey, page: p }), [baseKey]);
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
 
-  const baseKey = JSON.stringify(baseParams);
   const params = useMemo(() => {
     const clean = Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== "" && v != null));
     return { ...JSON.parse(baseKey), ...clean, sort: sort.key, dir: sort.dir, page, limit: PAGE_SIZE };
@@ -50,21 +53,16 @@ export function useProjectList(baseParams, defaultSort = { key: "serialNo", dir:
   const setFilter = useCallback((key, value) => {
     setFilters((f) => ({ ...f, [key]: value }));
     setPage(1);
-  }, []);
+  }, [setPage]);
   const clearFilters = useCallback(() => {
     setFilters({});
     setPage(1);
-  }, []);
+  }, [setPage]);
   const toggleSort = useCallback((key) => {
     setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
     setPage(1);
-  }, []);
+  }, [setPage]);
   const reload = useCallback(() => setTick((n) => n + 1), []);
-
-  // switching tab (base params) starts from page 1
-  useEffect(() => {
-    setPage(1);
-  }, [baseKey]);
 
   return {
     rows, total, loading, page, setPage, pages: Math.max(1, Math.ceil(total / PAGE_SIZE)),

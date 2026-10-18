@@ -10,8 +10,8 @@ import { notifyError, notifySuccess } from "@/lib/notify";
 import Avatar from "../users/Avatar";
 import { STATUS, isoToday } from "./projectMeta";
 
-const inputCls = "neu-inset w-full px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-neu-accent";
-const labelCls = "mb-1.5 block text-xs font-bold uppercase tracking-wide text-neu-muted";
+const inputCls = "cc-field w-full px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-cc-primary";
+const labelCls = "mb-1.5 block text-xs font-bold uppercase tracking-wide text-cc-muted";
 
 export function Modal({ title, onClose, children }) {
   useEffect(() => {
@@ -21,10 +21,10 @@ export function Modal({ title, onClose, children }) {
   }, [onClose]);
   return (
     <div role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-[60] flex items-end justify-center bg-black/30 sm:items-center sm:p-4">
-      <div className="neu-raised max-h-[92vh] w-full max-w-lg overflow-y-auto p-6">
+      <div className="cc-card max-h-[92vh] w-full max-w-lg overflow-y-auto p-6">
         <div className="mb-4 flex items-start justify-between gap-4">
           <h2 className="text-lg font-extrabold">{title}</h2>
-          <button type="button" onClick={onClose} aria-label="Close" className="text-neu-muted"><X size={18} /></button>
+          <button type="button" onClick={onClose} aria-label="Close" className="text-cc-muted"><X size={18} /></button>
         </div>
         {children}
       </div>
@@ -60,9 +60,9 @@ export function AssignDialog({ project, staff, workload = [], onClose, onSaved }
 
   return (
     <Modal title={`Assign team · App ${project.appNo}`} onClose={onClose}>
-      <p className="mb-4 text-sm text-neu-muted">Inspectors share the 45%; support staff share the 10%. The number is each person&apos;s open jobs.</p>
-      <label className="neu-inset mb-3 flex items-center gap-2 px-4 py-2.5">
-        <Search size={15} className="text-neu-muted" aria-hidden />
+      <p className="mb-4 text-sm text-cc-muted">Inspectors share the 45%; support staff share the 10%. The number is each person&apos;s open jobs.</p>
+      <label className="cc-field mb-3 flex items-center gap-2 px-4 py-2.5">
+        <Search size={15} className="text-cc-muted" aria-hidden />
         <span className="sr-only">Search staff</span>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search staff" className="w-full bg-transparent text-sm outline-none" />
       </label>
@@ -74,7 +74,7 @@ export function AssignDialog({ project, staff, workload = [], onClose, onSaved }
               <Avatar name={s.name} src={s.imageUrl} size={34} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold">{s.name}</span>
-                <span className="block truncate text-xs text-neu-muted">{s.designation || "—"} · {openJobs[s._id] || 0} open</span>
+                <span className="block truncate text-xs text-cc-muted">{s.designation || "—"} · {openJobs[s._id] || 0} open</span>
               </span>
               <span className="flex shrink-0 gap-1" role="group" aria-label={`Role for ${s.name}`}>
                 {[["", "—"], ["inspector", "Inspector"], ["support", "Support"]].map(([v, l]) => (
@@ -83,7 +83,7 @@ export function AssignDialog({ project, staff, workload = [], onClose, onSaved }
                     type="button"
                     onClick={() => setRoles((r) => ({ ...r, [s._id]: v }))}
                     aria-pressed={role === v}
-                    className={`rounded-lg px-2.5 py-1.5 text-xs font-bold ${role === v ? (v ? "neu-primary" : "neu-inset") : "neu-raised-sm"}`}
+                    className={`rounded-lg px-2.5 py-1.5 text-xs font-bold ${role === v ? (v ? "cc-btn-primary" : "rounded-[10px] border border-cc-primary/40 bg-cc-primary-soft text-cc-primary") : "cc-chip"}`}
                   >
                     {l}
                   </button>
@@ -92,15 +92,15 @@ export function AssignDialog({ project, staff, workload = [], onClose, onSaved }
             </li>
           );
         })}
-        {shown.length === 0 && <li className="p-4 text-center text-sm text-neu-muted">No staff found. Add faculty in Users first.</li>}
+        {shown.length === 0 && <li className="p-4 text-center text-sm text-cc-muted">No staff found. Add faculty in Users first.</li>}
       </ul>
       <label className="mt-5 block">
         <span className={labelCls}>Planned inspection date · ತಪಾಸಣೆ ದಿನಾಂಕ</span>
         <input type="date" value={planned} onChange={(e) => setPlanned(e.target.value)} className={inputCls} />
       </label>
       <div className="mt-6 flex items-center justify-between gap-3">
-        <span className="text-sm text-neu-muted">{chosen.length} selected</span>
-        <button type="button" disabled={saving || !chosen.some(([, r]) => r === "inspector")} onClick={save} className="neu-primary neu-press flex items-center gap-2 px-5 py-3 text-sm disabled:opacity-50">
+        <span className="text-sm text-cc-muted">{chosen.length} selected</span>
+        <button type="button" disabled={saving || !chosen.some(([, r]) => r === "inspector")} onClick={save} className="cc-btn-primary cc-press flex items-center gap-2 px-5 py-3 text-sm disabled:opacity-50">
           {saving ? <LoaderCircle size={16} className="animate-spin" /> : <UsersRound size={16} />} Save team
         </button>
       </div>
@@ -149,7 +149,7 @@ export function StatusDialog({ project, to, onClose, onSaved }) {
             <label className="block">
               <span className={labelCls}>Distance km · ದೂರ</span>
               <input type="number" min="0" inputMode="numeric" value={f.km} onChange={set("km")} className={inputCls} />
-              <span className="mt-1 block text-xs text-neu-muted">TA ₹15/km</span>
+              <span className="mt-1 block text-xs text-cc-muted">TA ₹15/km</span>
             </label>
           </div>
         )}
@@ -170,8 +170,8 @@ export function StatusDialog({ project, to, onClose, onSaved }) {
           <textarea rows={2} required={needsReason} value={f.note} onChange={set("note")} placeholder={to === "cancelled" ? "e.g. date mismatch" : ""} className={inputCls} />
         </label>
         <div className="flex justify-end gap-3 pt-2">
-          <button type="button" onClick={onClose} className="neu-raised-sm neu-press px-5 py-2.5 text-sm font-semibold">Back</button>
-          <button type="submit" disabled={saving} className={`neu-press flex items-center gap-2 px-5 py-2.5 text-sm font-bold disabled:opacity-60 ${to === "cancelled" ? "neu-raised-sm text-neu-bad" : "neu-primary"}`}>
+          <button type="button" onClick={onClose} className="cc-chip cc-press px-5 py-2.5 text-sm font-semibold">Back</button>
+          <button type="submit" disabled={saving} className={`cc-press flex items-center gap-2 px-5 py-2.5 text-sm font-bold disabled:opacity-60 ${to === "cancelled" ? "cc-chip text-cc-bad" : "cc-btn-primary"}`}>
             {saving ? <LoaderCircle size={16} className="animate-spin" /> : <a.icon size={16} />} {a.button}
           </button>
         </div>

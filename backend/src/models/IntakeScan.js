@@ -13,10 +13,6 @@ const intakeScanSchema = new mongoose.Schema(
     format: { type: String, default: "" }, // jpg, png, webp, pdf
     bytes: { type: Number, default: 0 },
     originalName: { type: String, default: "" },
-    // What the AI read, kept as-is so staff corrections can be compared later.
-    extracted: { type: mongoose.Schema.Types.Mixed, default: null },
-    extractionError: { type: String, default: "" },
-    model: { type: String, default: "" },
     project: { type: mongoose.Schema.Types.ObjectId, ref: "Project", default: null }, // set when saved
   },
   { timestamps: true }
