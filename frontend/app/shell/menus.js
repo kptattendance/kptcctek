@@ -1,13 +1,13 @@
 // Where each role lands after sign-in (/auth/check). Keys must match
 // backend/src/config/roles.js. Pages not built yet fall back to /auth/check.
 export const HOME_BY_ROLE = {
-  admin: "/overview",
-  manager: "/overview",
+  admin: "/manager",
+  manager: "/manager",
   office_staff: "/office/incoming",
   work_coordinator: "/coordinator",
   faculty: "/faculty",
   accounts: "/billing/bills",
-  approver: "/overview",
+  approver: "/principal",
   auditor: "/overview",
 };
 
@@ -17,6 +17,15 @@ export const DEFAULT_DASHBOARD = "/auth/check";
 // all). Coordinators and managers can also be put on inspection teams, so
 // they get "My inspections" too. Icons are mapped by name in AppShell.
 export const SECTIONS = [
+  {
+    title: "My desk",
+    kn: "ನನ್ನ ಮೇಜು",
+    roles: ["manager", "approver"],
+    items: [
+      { href: "/manager", label: "Manager desk", kn: "ವ್ಯವಸ್ಥಾಪಕರ ಮೇಜು", icon: "Gauge", roles: ["manager"] },
+      { href: "/principal", label: "Principal's desk", kn: "ಪ್ರಾಂಶುಪಾಲರ ಮೇಜು", icon: "Landmark", roles: ["approver", "manager"] },
+    ],
+  },
   {
     title: "Office",
     kn: "ಕಚೇರಿ",

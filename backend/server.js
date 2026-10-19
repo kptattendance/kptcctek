@@ -10,6 +10,7 @@ import connectDB from "./src/config/db.js";
 import accountRoutes from "./src/routes/accountRoutes.js";
 import projectRoutes from "./src/routes/projectRoutes.js";
 import billingRoutes from "./src/routes/billingRoutes.js";
+import deskRoutes from "./src/routes/deskRoutes.js";
 import { errorHandler, notFound } from "./src/middlewares/errorHandler.js";
 
 dotenv.config();
@@ -155,6 +156,7 @@ app.get("/api/health", (req, res) => {
 app.use("/api/users", accountRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/billing", billingRoutes);
+app.use("/api/desk", deskRoutes);
 
 // --------------------------------------------------
 // 7. API NOT FOUND HANDLER

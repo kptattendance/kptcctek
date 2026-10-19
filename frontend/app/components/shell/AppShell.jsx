@@ -10,14 +10,14 @@ import { Suspense, useEffect, useState } from "react";
 import { useClerk } from "@clerk/nextjs";
 import {
   ScanLine, ListChecks, UsersRound, ClipboardCheck, LayoutDashboard, Users, Menu, X, LogOut,
-  FilePlus2, FileText, Wallet, HandCoins, Settings, PieChart,
+  FilePlus2, FileText, Wallet, HandCoins, Settings, PieChart, Gauge, Landmark,
 } from "lucide-react";
 import { useMe } from "@/lib/useMe";
 import { sectionsFor } from "@/app/shell/menus";
 import Avatar from "../users/Avatar";
 
 const ICONS = {
-  ScanLine, ListChecks, UsersRound, ClipboardCheck, LayoutDashboard, Users, FilePlus2, FileText, Wallet, HandCoins, Settings, PieChart,
+  ScanLine, ListChecks, UsersRound, ClipboardCheck, LayoutDashboard, Users, FilePlus2, FileText, Wallet, HandCoins, Settings, PieChart, Gauge, Landmark,
 };
 
 function NavLinks({ sections, onNavigate }) {
