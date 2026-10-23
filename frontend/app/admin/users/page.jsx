@@ -137,7 +137,7 @@ export default function UsersPage() {
                     <button type="button" onClick={() => toggleActive(u)} disabled={busyId === u._id} aria-label={inactive ? `Activate ${u.name}` : `Deactivate ${u.name}`} title={inactive ? "Activate" : "Deactivate"} className={`cc-chip cc-press p-2.5 ${inactive ? "text-cc-ok" : "text-cc-warn"}`}>
                       {busyId === u._id ? <LoaderCircle size={16} className="animate-spin" /> : <Power size={16} />}
                     </button>
-                    <button type="button" onClick={() => { setDeleteError(""); setConfirm(u); }} aria-label={`Delete ${u.name}`} className="cc-chip cc-press p-2.5 text-cc-bad"><Trash2 size={16} /></button>
+                    <button type="button" onClick={() => setConfirm(u)} aria-label={`Delete ${u.name}`} className="cc-chip cc-press p-2.5 text-cc-bad"><Trash2 size={16} /></button>
                   </div>
                 </li>
               );

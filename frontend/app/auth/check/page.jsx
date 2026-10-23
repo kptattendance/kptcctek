@@ -1,125 +1,83 @@
 "use client";
 
+// After sign-in: ask the API who this is and send them to their home page.
+// Not registered / deactivated -> explain and sign out.
+// Server unreachable -> explain and offer "Try again" (do NOT sign out:
+// the person is fine, the connection is not).
+
 import { useAuth, useClerk } from "@clerk/nextjs";
-import axios from "axios";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useApi, apiError } from "@/lib/api";
 import FullPageStatus from "../../components/shell/FullPageStatus";
 import { HOME_BY_ROLE } from "../../shell/menus";
 
 export default function AuthCheckPage() {
-  const { isLoaded, isSignedIn, getToken } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
   const { signOut } = useClerk();
-
+  const api = useApi();
   const router = useRouter();
+  const [state, setState] = useState({ title: "Please wait", message: "Verifying your account...", retry: false });
+  const [attempt, setAttempt] = useState(0);
 
-  const [message, setMessage] = useState(
-    "Verifying your account..."
+  const leave = useCallback(
+    async (title, message, delay = 2500) => {
+      setState({ title, message, retry: false });
+      await signOut();
+      setTimeout(() => router.replace("/"), delay);
+    },
+    [signOut, router]
   );
 
   useEffect(() => {
-    if (!isLoaded) {
-      return;
-    }
-
+    if (!isLoaded) return;
     if (!isSignedIn) {
       router.replace("/");
       return;
     }
+    let cancelled = false;
 
-    const verifyUser = async () => {
-      try {
-        setMessage("Verifying your college account...");
+    api
+      .get("/users/me")
+      .then((res) => {
+        if (cancelled) return;
+        const home = HOME_BY_ROLE[res.data?.data?.role];
+        if (home) router.replace(home);
+        else leave("No access", "Your account does not have a CCTEK role. Please contact the administrator.");
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        const status = err.response?.status;
+        if (status === 403) leave("No access", err.response.data?.message || "You are not registered in CCTEK.", 4000);
+        else if (status === 401) leave("Signed out", "Your session has expired. Please sign in again.");
+        else setState({ title: "Can't reach CCTEK", message: apiError(err), retry: true });
+      });
 
-        const token = await getToken();
-
-        if (!token) {
-          throw new Error(
-            "Unable to obtain authentication token."
-          );
-        }
-
-        const response = await axios.get(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/users/me`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        const user = response.data?.data;
-
-        if (!user) {
-          throw new Error(
-            "User information not found."
-          );
-        }
-
-        console.log("Verified user:", user);
-        console.log("Role:", user.role);
-
-        // ==========================================
-        // ROLE BASED REDIRECTION
-        // ==========================================
-const home = HOME_BY_ROLE[user.role];
-if (home) {
-  router.replace(home);
-} else {
-  switch (user.role) {
-  case "student":
-    setMessage("Students do not sign in here. Results are published on the results page.");
-    await signOut();
-    setTimeout(() => router.replace("/"), 2500);
-    break;
-
-  default:
-    setMessage("Your account has an invalid role.");
-    await signOut();
-    setTimeout(() => router.replace("/"), 1500);
-  }
-}
-      } catch (error) {
-        console.error(
-          "Authentication verification failed:",
-          error
-        );
-
-        const serverMessage = error.response?.data?.message;
-
-        if (error.response?.status === 403 && serverMessage) {
-          // NOT_REGISTERED / DEACTIVATED: show the backend's reason
-          setMessage(serverMessage);
-        } else if (error.response?.status === 404) {
-          setMessage(
-            "Your Clerk account exists, but you are not registered in the college system."
-          );
-        } else if (error.response?.status === 401) {
-          setMessage(
-            "Authentication failed. Please sign in again."
-          );
-        } else {
-          setMessage(
-            "Unable to verify your account. Please try again."
-          );
-        }
-
-        await signOut();
-
-        setTimeout(() => {
-          router.replace("/");
-        }, 2000);
-      }
+    return () => {
+      cancelled = true;
     };
+  }, [isLoaded, isSignedIn, api, router, leave, attempt]);
 
-    verifyUser();
-  }, [
-    isLoaded,
-    isSignedIn,
-    getToken,
-    signOut,
-    router,
-  ]);
-
-  return <FullPageStatus message={message} />;
+  return (
+    <div>
+      <FullPageStatus title={state.title} message={state.message} />
+      {state.retry && (
+        <div className="-mt-[18vh] flex justify-center gap-2 pb-10">
+          <button
+            type="button"
+            onClick={() => {
+              setState({ title: "Please wait", message: "Trying again...", retry: false });
+              setAttempt((n) => n + 1);
+            }}
+            className="cc-btn-primary cc-press px-5 py-2.5 text-sm"
+          >
+            Try again
+          </button>
+          <button type="button" onClick={() => leave("Signed out", "Signing you out...", 500)} className="cc-btn cc-press px-5 py-2.5 text-sm">
+            Sign out
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }

@@ -2,62 +2,16 @@
 
 import { Show, SignInButton, UserButton, useAuth } from "@clerk/nextjs";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import axios from "axios";
+import { useMe } from "@/lib/useMe";
 import { HOME_BY_ROLE, DEFAULT_DASHBOARD } from "@/app/shell/menus";
 
 export default function Navbar() {
-  const { getToken, isLoaded, isSignedIn } = useAuth();
-  const [dashboard, setDashboard] = useState(DEFAULT_DASHBOARD);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function getDashboard() {
-      if (!isLoaded || !isSignedIn) {
-        setDashboard(DEFAULT_DASHBOARD);
-        return;
-      }
-
-      try {
-        const token = await getToken();
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-
-        if (!token || !apiUrl) {
-          if (!cancelled) setDashboard(DEFAULT_DASHBOARD);
-          return;
-        }
-
-        // NEXT_PUBLIC_API_URL includes /api, so do not append /api again.
-        const response = await axios.get(`${apiUrl}/api/users/me`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        const role = response.data?.data?.role;
-
-        if (!cancelled) {
-          setDashboard(HOME_BY_ROLE[role] || DEFAULT_DASHBOARD);
-        }
-      } catch (error) {
-        console.error("Failed to determine CCTEK dashboard:", error);
-
-        if (!cancelled) {
-          setDashboard(DEFAULT_DASHBOARD);
-        }
-      }
-    }
-
-    getDashboard();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [getToken, isLoaded, isSignedIn]);
+  const { isSignedIn } = useAuth();
+  const { me } = useMe(); // shared, cached /users/me (same call the pages use)
+  const dashboard = (isSignedIn && me && HOME_BY_ROLE[me.role]) || DEFAULT_DASHBOARD;
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-cc-border bg-white/95 backdrop-blur-md">
+    <nav className="no-print sticky top-0 z-50 border-b border-cc-border bg-white/95 backdrop-blur-md">
       <div className="flex h-16 items-center justify-between px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cc-sidebar text-sm font-extrabold text-cc-accent">

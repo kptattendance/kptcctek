@@ -103,9 +103,7 @@ export default function RootLayout({ children }) {
       <html lang="en" className={jakarta.variable}>
         <body className="min-h-screen bg-cc-bg text-cc-text antialiased">
           <Toaster position="top-center" richColors closeButton expand toastOptions={{ style: { fontSize: "14px" } }} />
-          <div className="no-print">
-            <Navbar />
-          </div>
+          <Navbar />
           <main>{children}</main>
         </body>
       </html>
