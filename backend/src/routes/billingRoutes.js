@@ -2,11 +2,11 @@
 
 import express from "express";
 import { authenticateUser } from "../middlewares/requireAuth.js";
-import { requirePermission } from "../middlewares/requireRole.js";
+import { requirePermission, adminOnly } from "../middlewares/requireRole.js";
 import {
   readyToBill, listBills, getBill, createBill, issueBill, markSent, cancelBill,
   recordReceipt, reverseReceipt, listReceipts,
-  pendingDistribution, createStatement, listStatements, getStatement, approveStatement, disburseStatement, cancelStatement, myEarnings,
+  pendingDistribution, createStatement, listStatements, getStatement, approveStatement, disburseStatement, cancelStatement, deleteStatement, myEarnings,
   overview, readSettings, updateSettings, listAllParties, updateParty,
 } from "../controllers/billingController.js";
 
@@ -42,6 +42,7 @@ router.get("/statements/:id", payRead, getStatement);
 router.post("/statements/:id/approve", payApprove, approveStatement);
 router.post("/statements/:id/disburse", requirePermission("payouts.prepare", "payouts.approve"), disburseStatement);
 router.post("/statements/:id/cancel", requirePermission("payouts.prepare", "payouts.approve"), cancelStatement);
+router.delete("/statements/:id", adminOnly, deleteStatement);
 
 router.get("/settings", read, readSettings);
 router.put("/settings", requirePermission("settings.manage"), updateSettings);

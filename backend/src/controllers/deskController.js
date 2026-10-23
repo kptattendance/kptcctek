@@ -74,6 +74,7 @@ const ACTION_TEXT = {
   "statement.approve": "approved statement",
   "statement.disburse": "marked paid out",
   "statement.cancel": "cancelled statement",
+  "statement.delete": "deleted statement",
   "settings.update": "updated bill settings",
   "party.update": "updated party",
   "user.create": "added user",
@@ -113,7 +114,7 @@ async function recentActivity(limit = 15) {
       who: r.actor?.name || r.actorEmail,
       action: r.action,
       verb: ACTION_TEXT[r.action],
-      target: target.text || "",
+      target: target.text || r.before?.number || r.before?.name || "", // deleted records: name kept in the log
       href: target.href || null,
       projectId: target.projectId || null,
       detail,

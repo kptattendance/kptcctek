@@ -7,7 +7,8 @@
 //
 //   draft (prepared) -> approved (by Principal / Manager, never the preparer)
 //                    -> disbursed (paid out)
-//   draft -> cancelled (its applications go back to "waiting")
+//   draft / approved -> cancelled (its applications go back to "waiting")
+//   disbursed -> cancelled: Admin only, to correct a mistake
 
 import mongoose from "mongoose";
 

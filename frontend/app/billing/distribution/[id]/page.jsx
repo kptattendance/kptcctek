@@ -5,8 +5,8 @@
 
 import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { ArrowLeft, Printer, BadgeCheck, Banknote, Ban } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, Printer, BadgeCheck, Banknote, Ban, Trash2 } from "lucide-react";
 import { useApi, formatRupees } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { useMe } from "@/lib/useMe";
@@ -26,6 +26,7 @@ export default function StatementPage() {
 
 function StatementView() {
   const { id } = useParams();
+  const router = useRouter();
   const api = useApi();
   const { me } = useMe();
   const { data: st, extra, loading, reload } = useFetch(`/billing/statements/${id}`);
@@ -77,9 +78,14 @@ function StatementView() {
               <Banknote size={16} aria-hidden /> Mark paid out
             </Button>
           )}
-          {((st.status === "draft" && can(me, "payouts.prepare")) || (st.status === "approved" && can(me, "payouts.approve"))) && (
+          {((st.status === "draft" && can(me, "payouts.prepare")) || (st.status === "approved" && can(me, "payouts.approve")) || (st.status === "disbursed" && me?.role === "admin")) && (
             <Button onClick={() => setDialog("cancel")} className="!text-cc-bad">
               <Ban size={16} aria-hidden /> Cancel
+            </Button>
+          )}
+          {me?.role === "admin" && (
+            <Button onClick={() => setDialog("delete")} className="!text-cc-bad">
+              <Trash2 size={16} aria-hidden /> Delete
             </Button>
           )}
         </div>
@@ -196,12 +202,41 @@ function StatementView() {
       {dialog === "cancel" && (
         <ConfirmDialog
           title="Cancel this statement?"
-          message="Its applications go back to waiting and can be put on a new statement."
+          message={
+            st.status === "disbursed"
+              ? `This statement is already paid out (${st.disbursedRef}). Cancelling does not take back money already paid; settle any difference with people yourself. Its applications go back to waiting so you can prepare ${monthLabel(st.month)} again.`
+              : "Its applications go back to waiting and can be put on a new statement."
+          }
           confirmLabel="Cancel statement"
           danger
           needReason
           onClose={() => setDialog(null)}
           onConfirm={(reason) => post("/cancel", { reason }, "Statement cancelled.")}
+        />
+      )}
+      {dialog === "delete" && (
+        <ConfirmDialog
+          title={`Delete ${st.number}?`}
+          message={
+            <>
+              This removes the statement completely. It can&apos;t be undone; only the activity log keeps a record.
+              Its applications go back to waiting so you can prepare {monthLabel(st.month)} again.
+              {st.status === "disbursed" && <span className="mt-2 block font-semibold text-cc-bad">It is already paid out ({st.disbursedRef}). Deleting does not take back money already paid.</span>}
+            </>
+          }
+          confirmLabel="Delete statement"
+          danger
+          needReason
+          onClose={() => setDialog(null)}
+          onConfirm={async (reason) => {
+            try {
+              const res = await api.delete(`/billing/statements/${st._id}`, { data: { reason } });
+              notifySuccess(res.data.message || "Statement deleted.");
+              router.replace("/billing/distribution");
+            } catch (err) {
+              notifyError(err);
+            }
+          }}
         />
       )}
     </div>

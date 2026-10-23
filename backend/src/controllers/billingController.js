@@ -560,18 +560,45 @@ export const cancelStatement = async (req, res) => {
   const out = await inTransaction(async (session) => {
     const doc = await RemunerationStatement.findById(id).session(session);
     if (!doc) throw new HttpError(404, "Statement not found.");
-    if (doc.status === "disbursed") throw new HttpError(409, "A statement already paid out can't be cancelled.");
+    // Paid out: only the Admin can reopen it, to correct a mistake. Whatever was
+    // already paid to people is settled outside the system.
+    if (doc.status === "disbursed" && req.user.role !== "admin") throw new HttpError(403, "Only the Admin can cancel a statement that is already paid out.");
     if (doc.status === "cancelled") throw new HttpError(409, "Already cancelled.");
     if (doc.status === "approved" && !hasPermission(req.user.role, "payouts.approve"))
       throw new HttpError(403, "Only an approver can cancel an approved statement.");
-    const before = doc.status;
+    const before = { status: doc.status, ...(doc.status === "disbursed" ? { disbursedAt: doc.disbursedAt, disbursedRef: doc.disbursedRef, amount: doc.totals.amount + doc.totals.ta } : {}) };
     Object.assign(doc, { status: "cancelled", cancelledBy: req.user.dbId, cancelledAt: new Date(), cancelReason: reason });
     await doc.save({ session });
     await Distribution.updateMany({ statement: doc._id }, { $set: { statement: null } }, { session });
-    await audit(req, { action: "statement.cancel", entity: "RemunerationStatement", entityId: doc._id, before: { status: before }, after: { status: "cancelled" }, note: reason }, session);
+    await audit(req, { action: "statement.cancel", entity: "RemunerationStatement", entityId: doc._id, before, after: { status: "cancelled" }, note: reason }, session);
     return doc;
   });
   res.json({ success: true, data: out });
+};
+
+// Admin only (checked in the route): remove a statement completely, in any
+// status. Its applications go back to waiting; the audit log keeps a copy.
+export const deleteStatement = async (req, res) => {
+  const id = objectId(req.params.id);
+  const reason = str(req.body?.reason, { name: "Reason", required: true, max: 300 });
+  const doc = await inTransaction(async (session) => {
+    const doc = await RemunerationStatement.findById(id).session(session).lean();
+    if (!doc) throw new HttpError(404, "Statement not found.");
+    await Distribution.updateMany({ statement: id }, { $set: { statement: null } }, { session });
+    await RemunerationStatement.deleteOne({ _id: id }, { session });
+    await audit(req, {
+      action: "statement.delete",
+      entity: "RemunerationStatement",
+      entityId: id,
+      before: {
+        number: doc.number, month: doc.month, status: doc.status, totals: doc.totals, people: doc.people,
+        preparedBy: doc.preparedBy, approvedBy: doc.approvedBy, disbursedAt: doc.disbursedAt, disbursedRef: doc.disbursedRef,
+      },
+      note: reason,
+    }, session);
+    return doc;
+  });
+  res.json({ success: true, message: `Statement ${doc.number} deleted. Its applications are waiting again.` });
 };
 
 // The signed-in person's own remuneration, application by application.
