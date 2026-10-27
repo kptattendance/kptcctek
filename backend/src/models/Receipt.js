@@ -15,6 +15,10 @@ const receiptSchema = new mongoose.Schema(
     financialYear: { type: String, required: true, index: true },
     bill: { type: mongoose.Schema.Types.ObjectId, ref: "Bill", required: true, index: true },
     party: { type: mongoose.Schema.Types.ObjectId, ref: "Party", required: true, index: true },
+    // One cheque on a Statement of Bills is recorded as one receipt per bill,
+    // all sharing the same batch id.
+    group: { type: mongoose.Schema.Types.ObjectId, ref: "BillGroup", default: null, index: true },
+    batch: { type: mongoose.Schema.Types.ObjectId, default: null, index: true },
 
     mode: { type: String, enum: RECEIPT_MODES, default: "cheque" },
     instrumentNo: { type: String, trim: true, required: true, maxlength: 40 }, // cheque / UTR number

@@ -5,6 +5,9 @@ import mongoose from "mongoose";
 import Project, { STATUS_FLOW } from "../models/Project.js";
 import User from "../models/User.js";
 import Party from "../models/Party.js";
+import Fund from "../models/Fund.js";
+import Bill from "../models/Bill.js";
+import Receipt from "../models/Receipt.js";
 import IntakeScan from "../models/IntakeScan.js";
 import NameDirectory, { learnName } from "../models/NameDirectory.js";
 import { ruleForDate } from "../models/BillingRule.js";
@@ -131,6 +134,8 @@ export const createProject = async (req, res) => {
   const input = readProjectInput(b);
   const party = await Party.findById(objectId(b.partyId, "party")).lean();
   if (!party?.isActive) throw new HttpError(400, "Please choose the party the work came from.");
+  const fund = b.fundId ? await Fund.findOne({ _id: objectId(b.fundId, "fund"), isActive: true }).lean() : null;
+  if (b.fundId && !fund) throw new HttpError(400, "Please choose the fund from the list.");
 
   // A scan can be attached only by the person who uploaded it, and only once.
   let scan = null;
@@ -161,6 +166,7 @@ export const createProject = async (req, res) => {
           financialYear: fy,
           serialNo,
           party: party._id,
+          fund: fund?._id || null,
           gstMode,
           charges,
           inward: { letterRefNo: letterRefNo || "", letterDate: letterDate || null, scan: scan?._id || null },
@@ -251,13 +257,24 @@ export const listProjects = async (req, res) => {
 export const getProject = async (req, res) => {
   const project = await Project.findById(objectId(req.params.id))
     .populate("party", "code name gstMode")
+    .populate("fund", "name nameEn")
     .populate("team.user", "name designation")
     .populate("createdBy", "name")
     .populate("statusHistory.by", "name");
   if (!project) throw new HttpError(404, "Project not found.");
   const inTeam = project.team.some((m) => String(m.user?._id) === String(req.user.dbId));
   if (!hasPermission(req.user.role, "projects.read") && !inTeam) throw new HttpError(404, "Project not found.");
-  res.json({ success: true, data: project });
+
+  // Its bill, the Statement of Bills it went on, and the cheque(s) that paid it.
+  let billing = null;
+  if (project.bill) {
+    const [bill, receipts] = await Promise.all([
+      Bill.findById(project.bill).select("number status billDate totals settled group").populate("group", "number status").lean(),
+      Receipt.find({ bill: project.bill }).select("number mode instrumentNo instrumentDate bankName receivedOn amount tdsIncomeTax tdsGst otherDeduction status").sort({ receivedOn: 1 }).lean(),
+    ]);
+    billing = { bill, receipts };
+  }
+  res.json({ success: true, data: { ...project.toJSON(), billing } });
 };
 
 // ---------------------------------------------------------------- coordinator

@@ -1,14 +1,15 @@
 "use client";
 
-// What is printed on bills: CCTEK's own details, bank, signatory; and each
-// party's billing address / GSTIN.
+// What is printed on bills: CCTEK's own details, bank, signatory, bill number;
+// each party's billing address / GSTIN; and the list of funds (ಅನುದಾನ).
 
 import { useState } from "react";
-import { Pencil } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { useApi } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { useMe } from "@/lib/useMe";
 import { useFetch, can } from "@/lib/billing";
+import { useFunds } from "@/app/components/projects/useProjectList";
 import { Modal } from "@/app/components/projects/dialogs";
 import { PageHeader, Card, Field, Button, inputCls, Spinner } from "@/app/components/ui";
 
@@ -27,6 +28,8 @@ const FIELDS = [
   ["bankBranch", "Branch", "ಶಾಖೆ"],
   ["ifsc", "IFSC", "ಐಎಫ್‌ಎಸ್‌ಸಿ"],
   ["billSignatory", "Bill signed by", "ಸಹಿ"],
+  ["groupSignatory", "Statement of Bills signed by", "ಪಟ್ಟಿಗೆ ಸಹಿ"],
+  ["billPrefix", "Bill no. starts with", "ಬಿಲ್ ಸಂಖ್ಯೆ ಆರಂಭ", "wide", "Bill no. = this / year / bill date / running no., e.g. ಸಂ.ಕೆಪಿಎಂ/ಸಿಸಿಟೆಕ್/ಟಿ.ಪಿ.ಐ.ಆರ್/2026-27/12.04.2026/1459"],
   ["billNote", "Note printed on the bill", "ಟಿಪ್ಪಣಿ", "textarea"],
 ];
 
@@ -34,7 +37,11 @@ export default function BillSettingsPage() {
   const { me } = useMe();
   const settings = useFetch("/billing/settings");
   const parties = useFetch("/billing/parties");
+  const funds = useFetch("/billing/funds", { all: true });
+  const { refresh: refreshFundList } = useFunds();
   const [editParty, setEditParty] = useState(null);
+  const [editFund, setEditFund] = useState(null); // {} = new
+  const manage = can(me, "settings.manage");
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -79,6 +86,62 @@ export default function BillSettingsPage() {
         </table>
       </Card>
 
+      <Card
+        title="Funds"
+        kn="ಅನುದಾನ / ನಿಧಿ"
+        bodyClass="overflow-x-auto"
+        actions={
+          manage && (
+            <Button onClick={() => setEditFund({})} className="!py-1.5">
+              <Plus size={14} aria-hidden /> Add fund
+            </Button>
+          )
+        }
+      >
+        <table className="w-full min-w-[560px] text-sm">
+          <thead className="bg-cc-subtle text-left text-xs text-cc-muted">
+            <tr>
+              <th className="px-4 py-2">Fund (as printed)</th>
+              <th className="px-4 py-2">Words on a letter that mean it</th>
+              <th className="px-4 py-2">Status</th>
+              <th className="px-4 py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {(funds.data || []).map((f) => (
+              <tr key={f._id} className={`border-t border-cc-border align-top ${f.isActive ? "" : "text-cc-muted"}`}>
+                <td className="px-4 py-2">
+                  <span className="font-semibold">{f.name}</span>
+                  {f.nameEn && <span className="block text-xs text-cc-muted">{f.nameEn}</span>}
+                </td>
+                <td className="px-4 py-2 text-xs">{f.keywords?.join(", ") || "—"}</td>
+                <td className="px-4 py-2">{f.isActive ? "In use" : "Hidden"}</td>
+                <td className="px-4 py-2 text-right">
+                  {manage && (
+                    <button type="button" onClick={() => setEditFund(f)} className="cc-chip cc-press p-2" aria-label={`Edit ${f.name}`}>
+                      <Pencil size={14} />
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="px-4 py-3 text-xs text-cc-muted">Shown as a dropdown on new applications. A hidden fund stays on old applications and bills.</p>
+      </Card>
+
+      {editFund && (
+        <FundDialog
+          fund={editFund}
+          onClose={() => setEditFund(null)}
+          onSaved={() => {
+            setEditFund(null);
+            funds.reload();
+            refreshFundList();
+          }}
+        />
+      )}
+
       {editParty && (
         <PartyDialog
           party={editParty}
@@ -114,8 +177,8 @@ function SettingsForm({ initial, canEdit, onSaved }) {
   return (
     <Card title="CCTEK details" kn="ಸಿಸಿಟೆಕ್ ವಿವರಗಳು">
       <fieldset disabled={!canEdit} className="grid gap-4 sm:grid-cols-2">
-        {FIELDS.map(([k, label, kn, type]) => (
-          <Field key={k} label={label} kn={kn} className={type === "textarea" ? "sm:col-span-2" : ""}>
+        {FIELDS.map(([k, label, kn, type, hint]) => (
+          <Field key={k} label={label} kn={kn} hint={hint} className={type === "textarea" || type === "wide" ? "sm:col-span-2" : ""}>
             {type === "textarea" ? (
               <textarea value={f[k] || ""} onChange={(e) => setF((x) => ({ ...x, [k]: e.target.value }))} rows={2} className={inputCls} />
             ) : (
@@ -135,6 +198,63 @@ function SettingsForm({ initial, canEdit, onSaved }) {
         </div>
       )}
     </Card>
+  );
+}
+
+function FundDialog({ fund, onClose, onSaved }) {
+  const api = useApi();
+  const isNew = !fund._id;
+  const [f, setF] = useState({
+    name: fund.name || "",
+    nameEn: fund.nameEn || "",
+    keywords: (fund.keywords || []).join(", "),
+    isActive: fund.isActive !== false,
+  });
+  const [busy, setBusy] = useState(false);
+  const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value }));
+  return (
+    <Modal title={isNew ? "Add fund" : `Fund · ${fund.name}`} onClose={onClose}>
+      <div className="space-y-3">
+        <Field label="Fund name (as printed on the statement)" kn="ಹೆಸರು" hint="e.g. ಮನಪಾ ಸಾಮಾನ್ಯ ನಿಧಿ">
+          <input value={f.name} onChange={set("name")} maxLength={120} className={inputCls} />
+        </Field>
+        <Field label="English name (optional)" kn="ಇಂಗ್ಲಿಷ್ ಹೆಸರು">
+          <input value={f.nameEn} onChange={set("nameEn")} maxLength={120} className={inputCls} />
+        </Field>
+        <Field label="Words on a letter that mean this fund (comma separated)" kn="ಪತ್ರದಲ್ಲಿನ ಪದಗಳು" hint="Used to choose the fund by itself when a letter is scanned, e.g. ಸಾಮಾನ್ಯ ನಿಧಿ">
+          <input value={f.keywords} onChange={set("keywords")} className={inputCls} />
+        </Field>
+        {!isNew && (
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={f.isActive} onChange={set("isActive")} className="h-4 w-4 accent-[var(--cc-primary)]" />
+            In use (shown in the dropdown)
+          </label>
+        )}
+        <div className="flex justify-end gap-2">
+          <Button onClick={onClose}>Back</Button>
+          <Button
+            primary
+            busy={busy}
+            disabled={!f.name.trim()}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                const body = { ...f, keywords: f.keywords.split(",").map((s) => s.trim()).filter(Boolean) };
+                if (isNew) await api.post("/billing/funds", body);
+                else await api.put(`/billing/funds/${fund._id}`, body);
+                notifySuccess("Fund saved.");
+                onSaved();
+              } catch (err) {
+                notifyError(err);
+                setBusy(false);
+              }
+            }}
+          >
+            Save
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

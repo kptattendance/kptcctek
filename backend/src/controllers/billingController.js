@@ -7,6 +7,8 @@
 
 import mongoose from "mongoose";
 import Bill from "../models/Bill.js";
+import BillGroup from "../models/BillGroup.js";
+import Fund from "../models/Fund.js";
 import Receipt, { RECEIPT_MODES } from "../models/Receipt.js";
 import Distribution from "../models/Distribution.js";
 import RemunerationStatement from "../models/RemunerationStatement.js";
@@ -15,20 +17,23 @@ import Party from "../models/Party.js";
 import User from "../models/User.js";
 import Settings, { getSettings } from "../models/Settings.js";
 import { ruleByCode } from "../models/BillingRule.js";
-import { nextSequence, financialYear } from "../models/Counter.js";
+import Counter, { nextSequence, financialYear } from "../models/Counter.js";
 import { audit } from "../models/AuditLog.js";
 import { DEFAULT_RULE } from "../services/billingService.js";
 import { distribute, summarise } from "../services/distributionService.js";
 import { hasPermission } from "../config/roles.js";
 import {
-  HttpError, str, oneOf, rupees, date, compact, objectId, escapeRegex, paging, email,
+  HttpError, str, oneOf, rupees, num, date, compact, objectId, escapeRegex, paging, email,
 } from "../utils/validate.js";
 
 const t = mongoose.trusted;
 const pad = (n, w) => String(n).padStart(w, "0");
 const endOfDay = (d) => new Date(d.getTime() + 86_399_999);
 
-async function inTransaction(fn) {
+// "none" in a filter = no fund chosen
+export const fundFilter = (v) => (v === "none" ? null : objectId(v, "fund"));
+
+export async function inTransaction(fn) {
   const session = await mongoose.startSession();
   try {
     let out;
@@ -54,13 +59,15 @@ function pushStatus(project, to, by, note = "") {
 export const readyToBill = async (req, res) => {
   const filter = { status: "report_issued", bill: null };
   if (req.query.party) filter.party = objectId(req.query.party, "party");
+  if (req.query.fund) filter.fund = fundFilter(req.query.fund);
   if (req.query.q) {
     const rx = new RegExp(escapeRegex(str(req.query.q, { name: "Search", max: 60 })), "i");
     filter.$or = [{ appNo: rx }, { contractorName: rx }, { fileNo: rx }, { ward: rx }, { "report.certificateNo": rx }];
   }
   const items = await Project.find(filter)
-    .select("serialNo financialYear appNo appDate appDetails party ward fileNo workYear contractorName projectBillAmount km charges report inspectionDate team")
+    .select("serialNo financialYear appNo appDate appDetails party fund fundSource ward fileNo workYear contractorName projectBillAmount estimateAmount km charges report inspectionDate team")
     .populate("party", "code name gstMode")
+    .populate("fund", "name nameEn")
     .populate("team.user", "name")
     .sort({ "report.issuedOn": 1, serialNo: 1 })
     .limit(500)
@@ -72,6 +79,7 @@ export const readyToBill = async (req, res) => {
 
 const BILL_POPULATE = [
   { path: "party", select: "code name billingAddress gstin gstMode" },
+  { path: "group", select: "number status" },
   { path: "createdBy", select: "name" },
   { path: "issuedBy", select: "name" },
   { path: "cancelledBy", select: "name" },
@@ -83,6 +91,7 @@ export const listBills = async (req, res) => {
   const filter = {};
   if (q.fy) filter.$or = [{ financialYear: str(q.fy, { name: "Year", max: 7 }) }, { financialYear: null }];
   if (q.party) filter.party = objectId(q.party, "party");
+  if (q.fund) filter.fund = fundFilter(q.fund);
   if (q.status) {
     const wanted = str(q.status, { name: "Status", max: 80 }).split(",").filter(Boolean);
     filter.status = wanted.length > 1 ? t({ $in: wanted }) : wanted[0];
@@ -96,8 +105,9 @@ export const listBills = async (req, res) => {
   }
   const [items, total, counts] = await Promise.all([
     Bill.find(filter)
-      .select("number status party partySnapshot billDate totals settled lines.appNo sentOn createdAt")
+      .select("number status party partySnapshot fund fundName group billDate totals settled lines.appNo sentOn createdAt")
       .populate("party", "code name")
+      .populate("group", "number status")
       .sort({ billDate: -1, createdAt: -1 })
       .skip(skip)
       .limit(limit),
@@ -140,6 +150,9 @@ function lineFrom(p) {
     description: p.appDetails,
     contractorName: p.contractorName,
     certificateNo: p.report?.certificateNo || "",
+    letterRefNo: p.inward?.letterRefNo || "",
+    letterDate: p.inward?.letterDate || null,
+    estimateAmount: p.estimateAmount ?? null,
     projectBillAmount: p.projectBillAmount,
     servicePercent: c.servicePercent ?? null,
     lumpsum: Boolean(c.lumpsum),
@@ -159,52 +172,97 @@ function totalsOf(lines) {
   return { net, gst, cgst, sgst: gst - cgst, total: net + gst };
 }
 
-// Create a DRAFT bill for some ready jobs of one party.
+// Create DRAFT bills for some ready jobs of one party: by default one bill
+// per application (separate: true), or one bill for all of them. `fundId`
+// fills in the fund of applications that have none yet.
 export const createBill = async (req, res) => {
   const b = req.body || {};
   const ids = Array.isArray(b.projectIds) ? [...new Set(b.projectIds.map((x) => objectId(x, "application")))] : [];
   if (!ids.length) throw new HttpError(400, "Select at least one application.");
-  if (ids.length > 200) throw new HttpError(400, "A bill can have at most 200 applications.");
+  if (ids.length > 200) throw new HttpError(400, "At most 200 applications at a time.");
+  const separate = b.separate !== false;
   const billDate = date(b.billDate, { name: "Bill date" }) || new Date();
   const subject = str(b.subject, { name: "Subject", max: 300 }) || "";
   const remarks = str(b.remarks, { name: "Remarks", max: 1000 }) || "";
+  const fundId = b.fundId ? objectId(b.fundId, "fund") : null;
 
-  const bill = await inTransaction(async (session) => {
+  const bills = await inTransaction(async (session) => {
     const projects = await Project.find({ _id: t({ $in: ids }) }).session(session);
     if (projects.length !== ids.length) throw new HttpError(404, "Some applications were not found.");
     const notReady = projects.filter((p) => p.status !== "report_issued" || p.bill);
     if (notReady.length) throw new HttpError(409, `Not ready to bill: ${notReady.map((p) => p.appNo).join(", ")}.`);
     const partyIds = new Set(projects.map((p) => String(p.party)));
-    if (partyIds.size > 1) throw new HttpError(400, "All applications on a bill must be from the same party.");
+    if (partyIds.size > 1) throw new HttpError(400, "All applications must be from the same party.");
     const noFee = projects.filter((p) => !p.charges?.net);
     if (noFee.length) throw new HttpError(400, `No fee calculated for: ${noFee.map((p) => p.appNo).join(", ")}.`);
-    const gstModes = new Set(projects.map((p) => p.charges.gstMode || "inclusive"));
-    if (gstModes.size > 1) throw new HttpError(400, "These applications mix GST-inclusive and GST-extra fees. Bill them separately.");
+
+    if (fundId && !(await Fund.exists({ _id: fundId, isActive: true }).session(session))) throw new HttpError(400, "Fund not found.");
+    const fundOf = (p) => (p.fund ? String(p.fund) : fundId ? String(fundId) : "");
+    const funds = new Map(
+      (await Fund.find({ _id: t({ $in: [...new Set(projects.map(fundOf).filter(Boolean))] }) }).session(session).lean()).map((f) => [String(f._id), f])
+    );
+
+    projects.sort((a, b2) => a.appDate - b2.appDate || a.serialNo - b2.serialNo);
+    const batches = separate ? projects.map((p) => [p]) : [projects];
+    if (!separate) {
+      if (new Set(projects.map(fundOf)).size > 1) throw new HttpError(400, "These applications are under different funds. Make a separate bill for each.");
+      if (new Set(projects.map((p) => p.charges.gstMode || "inclusive")).size > 1)
+        throw new HttpError(400, "These applications mix GST-inclusive and GST-extra fees. Make a separate bill for each.");
+    }
 
     const party = await Party.findById(projects[0].party).session(session).lean();
-    projects.sort((a, b2) => a.appDate - b2.appDate || a.serialNo - b2.serialNo);
-    const lines = projects.map(lineFrom);
-    const [doc] = await Bill.create(
-      [{
-        status: "draft",
-        party: party._id,
-        partySnapshot: { code: party.code, name: party.name, billingAddress: party.billingAddress, gstin: party.gstin },
-        gstMode: [...gstModes][0],
-        billDate,
-        subject: subject || `Third party inspection charges - ${lines.length} application${lines.length > 1 ? "s" : ""}`,
-        remarks,
-        lines,
-        totals: totalsOf(lines),
-        createdBy: req.user.dbId,
-      }],
-      { session }
-    );
-    // reserve the jobs so nobody puts them on a second bill
-    await Project.updateMany({ _id: t({ $in: ids }) }, { $set: { bill: doc._id, updatedBy: req.user.dbId } }, { session });
-    await audit(req, { action: "bill.create", entity: "Bill", entityId: doc._id, after: { lines: lines.length, total: doc.totals.total } }, session);
-    return doc;
+    const made = [];
+    for (const batch of batches) {
+      const lines = batch.map(lineFrom);
+      const fund = funds.get(fundOf(batch[0])) || null;
+      const [doc] = await Bill.create(
+        [{
+          status: "draft",
+          party: party._id,
+          partySnapshot: { code: party.code, name: party.name, billingAddress: party.billingAddress, gstin: party.gstin },
+          fund: fund?._id || null,
+          fundName: fund?.name || "",
+          gstMode: batch[0].charges.gstMode || "inclusive",
+          billDate,
+          subject: subject || (lines.length > 1 ? `Third party inspection charges - ${lines.length} applications` : `Third party inspection charges - application ${lines[0].appNo}`),
+          remarks,
+          lines,
+          totals: totalsOf(lines),
+          createdBy: req.user.dbId,
+        }],
+        { session }
+      );
+      // reserve the jobs so nobody puts them on a second bill; fill in a missing fund
+      for (const p of batch) {
+        await Project.updateOne(
+          { _id: p._id },
+          { $set: { bill: doc._id, updatedBy: req.user.dbId, ...(!p.fund && fund ? { fund: fund._id } : {}) } },
+          { session }
+        );
+      }
+      await audit(req, { action: "bill.create", entity: "Bill", entityId: doc._id, after: { lines: lines.length, total: doc.totals.total, fund: fund?.name || "" } }, session);
+      made.push(doc);
+    }
+    return made;
   });
-  res.status(201).json({ success: true, data: bill });
+  res.status(201).json({ success: true, data: bills[0], bills: bills.map((x) => ({ _id: x._id })) });
+};
+
+// Bill number as on the paper bills: prefix / year / bill date / running no.
+const ist = (d) => new Date(new Date(d).getTime() + 330 * 60_000); // dates print in Indian time
+const ddmmyyyy = (d) => {
+  const x = ist(d);
+  return `${pad(x.getUTCDate(), 2)}.${pad(x.getUTCMonth() + 1, 2)}.${x.getUTCFullYear()}`;
+};
+const billNumber = (prefix, fy, billDate, seq) => `${prefix || "CCTEK"}/${fy}/${ddmmyyyy(billDate)}/${seq}`;
+
+// What the next bill would be numbered (shown in the Issue dialog).
+export const nextBillNumber = async (req, res) => {
+  const billDate = date(req.query.date, { name: "Bill date" }) || new Date();
+  const fy = financialYear(billDate);
+  const [counter, settings] = await Promise.all([Counter.findById(`bill:${fy}`).lean(), getSettings()]);
+  const seq = (counter?.seq || 0) + 1;
+  res.json({ success: true, data: { financialYear: fy, seq, number: billNumber(settings.billPrefix, fy, billDate, seq) } });
 };
 
 // Give the draft its number and send it.
@@ -220,13 +278,25 @@ export const issueBill = async (req, res) => {
     // refresh the party copy: the address may have been filled in since the draft
     const party = await Party.findById(doc.party).session(session).lean();
     const fy = financialYear(billDate);
-    const seq = await nextSequence(`bill:${fy}`, session);
+    // The running number is normally the next one; it can be typed in (e.g. to
+    // match the outward register), and the counter then continues after it.
+    const wanted = num(b.seq, { name: "Bill no.", min: 1, max: 999_999 });
+    let seq;
+    if (wanted !== undefined) {
+      if (!Number.isInteger(wanted)) throw new HttpError(400, "Bill no. must be a whole number.");
+      if (await Bill.exists({ financialYear: fy, seq: wanted }).session(session)) throw new HttpError(409, `Bill no. ${wanted} is already used in ${fy}.`);
+      seq = wanted;
+      await Counter.updateOne({ _id: `bill:${fy}` }, { $max: { seq: wanted } }, { upsert: true, session });
+    } else {
+      seq = await nextSequence(`bill:${fy}`, session);
+    }
+    const settings = await getSettings();
     Object.assign(doc, {
       status: "issued",
       billDate,
       financialYear: fy,
       seq,
-      number: `CCTEK/${fy}/${pad(seq, 4)}`,
+      number: billNumber(settings.billPrefix, fy, billDate, seq),
       partySnapshot: { code: party.code, name: party.name, billingAddress: party.billingAddress, gstin: party.gstin },
       issuedBy: req.user.dbId,
       issuedAt: new Date(),
@@ -266,6 +336,8 @@ export const cancelBill = async (req, res) => {
     const doc = await Bill.findById(id).session(session);
     if (!doc) throw new HttpError(404, "Bill not found.");
     if (!["draft", "issued"].includes(doc.status)) throw new HttpError(409, "A bill with money received can't be cancelled. Reverse its receipts first.");
+    const group = await groupOf(doc, session);
+    if (group) throw new HttpError(409, `This bill is in Statement of Bills ${group.number}. Cancel that statement first.`);
     if (await Receipt.exists({ bill: id, status: "active" }).session(session)) throw new HttpError(409, "Reverse the receipts of this bill first.");
     const wasIssued = doc.status === "issued";
     Object.assign(doc, { status: "cancelled", cancelledBy: req.user.dbId, cancelledAt: new Date(), cancelReason: reason });
@@ -332,9 +404,14 @@ async function resettle(bill, session) {
   };
 }
 
-export const recordReceipt = async (req, res) => {
-  const id = objectId(req.params.id);
-  const b = req.body || {};
+// The live Statement of Bills a bill is on, if any.
+export async function groupOf(bill, session) {
+  if (!bill.group) return null;
+  const g = await BillGroup.findById(bill.group).select("number status").session(session).lean();
+  return g && g.status !== "cancelled" ? g : null;
+}
+
+export function readReceiptInput(b) {
   const input = {
     mode: oneOf(b.mode, RECEIPT_MODES, { name: "Mode" }) || "cheque",
     instrumentNo: str(b.instrumentNo, { name: "Cheque / reference no.", required: true, max: 40, pattern: /^[A-Za-z0-9/-]+$/ }),
@@ -350,36 +427,74 @@ export const recordReceipt = async (req, res) => {
   if (input.amount <= 0) throw new HttpError(400, "Amount must be more than zero.");
   if (input.receivedOn > endOfDay(new Date())) throw new HttpError(400, "Received date can't be in the future.");
   if (input.otherDeduction && !input.remarks) throw new HttpError(400, "Please say what the other deduction is for (remarks).");
+  return input;
+}
 
+// Record money against one bill, inside a transaction. Used by the bill
+// screen and, once per bill, by a cheque on a Statement of Bills (`link`
+// carries its group and batch; that cheque writes one audit entry itself).
+export async function applyReceipt(req, bill, input, session, link = {}) {
+  if (!["issued", "part_paid"].includes(bill.status)) throw new HttpError(409, bill.status === "paid" ? `Bill ${bill.number} is already fully paid.` : "Issue the bill before recording payment.");
+  if (input.receivedOn < new Date(bill.billDate.toDateString())) throw new HttpError(400, `Received date can't be before the bill date (${bill.number}).`);
+  if (await Receipt.exists({ bill: bill._id, status: "active", instrumentNo: input.instrumentNo }).session(session))
+    throw new HttpError(409, `Cheque / reference ${input.instrumentNo} is already recorded on bill ${bill.number}.`);
+  const settles = input.amount + input.tdsIncomeTax + input.tdsGst + input.otherDeduction;
+  const outstanding = bill.totals.total - bill.settled.total;
+  if (settles > outstanding)
+    throw new HttpError(400, `This settles ₹${(settles / 100).toFixed(2)} but only ₹${(outstanding / 100).toFixed(2)} is due on the bill.`);
+
+  const fy = financialYear(input.receivedOn);
+  const seq = await nextSequence(`receipt:${fy}`, session);
+  const [receipt] = await Receipt.create(
+    [{ ...input, ...link, number: `RCPT/${fy}/${pad(seq, 4)}`, financialYear: fy, bill: bill._id, party: bill.party, recordedBy: req.user.dbId }],
+    { session }
+  );
+  await resettle(bill, session);
+  const paid = bill.settled.total >= bill.totals.total;
+  bill.status = paid ? "paid" : "part_paid";
+  bill.paidAt = paid ? input.receivedOn : null;
+  await bill.save({ session });
+  if (paid) await distributeBill(req, bill, input.receivedOn, session);
+  if (!link.batch) await audit(req, { action: "receipt.create", entity: "Receipt", entityId: receipt._id, after: { bill: bill.number, ...input } }, session);
+  return { receipt, bill, paid };
+}
+
+export const recordReceipt = async (req, res) => {
+  const id = objectId(req.params.id);
+  const input = readReceiptInput(req.body || {});
   const out = await inTransaction(async (session) => {
     const bill = await Bill.findById(id).session(session);
     if (!bill) throw new HttpError(404, "Bill not found.");
-    if (!["issued", "part_paid"].includes(bill.status)) throw new HttpError(409, bill.status === "paid" ? "This bill is already fully paid." : "Issue the bill before recording payment.");
-    if (input.receivedOn < new Date(bill.billDate.toDateString())) throw new HttpError(400, "Received date can't be before the bill date.");
-    if (await Receipt.exists({ bill: id, status: "active", instrumentNo: input.instrumentNo }).session(session))
-      throw new HttpError(409, `Cheque / reference ${input.instrumentNo} is already recorded on this bill.`);
-    const settles = input.amount + input.tdsIncomeTax + input.tdsGst + input.otherDeduction;
-    const outstanding = bill.totals.total - bill.settled.total;
-    if (settles > outstanding)
-      throw new HttpError(400, `This settles ₹${(settles / 100).toFixed(2)} but only ₹${(outstanding / 100).toFixed(2)} is due on the bill.`);
-
-    const fy = financialYear(input.receivedOn);
-    const seq = await nextSequence(`receipt:${fy}`, session);
-    const [receipt] = await Receipt.create(
-      [{ ...input, number: `RCPT/${fy}/${pad(seq, 4)}`, financialYear: fy, bill: bill._id, party: bill.party, recordedBy: req.user.dbId }],
-      { session }
-    );
-    await resettle(bill, session);
-    const paid = bill.settled.total >= bill.totals.total;
-    bill.status = paid ? "paid" : "part_paid";
-    bill.paidAt = paid ? input.receivedOn : null;
-    await bill.save({ session });
-    if (paid) await distributeBill(req, bill, input.receivedOn, session);
-    await audit(req, { action: "receipt.create", entity: "Receipt", entityId: receipt._id, after: { bill: bill.number, ...input } }, session);
-    return { receipt, bill, paid };
+    const group = await groupOf(bill, session);
+    if (group) throw new HttpError(409, `This bill is in Statement of Bills ${group.number}. Record the cheque there, so it reaches every bill in it.`);
+    return applyReceipt(req, bill, input, session);
   });
   res.status(201).json({ success: true, data: out });
 };
+
+// Undo one receipt, inside a transaction (bounced cheque / wrong entry).
+export async function undoReceipt(req, receipt, reason, session) {
+  if (receipt.status === "reversed") throw new HttpError(409, "Already reversed.");
+  const bill = await Bill.findById(receipt.bill).session(session);
+  if (bill.status === "paid") {
+    const taken = await Distribution.findOne({ bill: bill._id, statement: t({ $ne: null }) }).populate("statement", "number").session(session);
+    if (taken) throw new HttpError(409, `The money of bill ${bill.number} is already in remuneration statement ${taken.statement?.number}. Cancel that statement first.`);
+    await Distribution.deleteMany({ bill: bill._id }, { session });
+    const projects = await Project.find({ _id: t({ $in: bill.lines.map((l) => l.project) }), status: "paid" }).session(session);
+    for (const p of projects) {
+      pushStatus(p, "billed", req.user.dbId, `Receipt ${receipt.number} reversed: ${reason}`);
+      await p.save({ session });
+    }
+  }
+  Object.assign(receipt, { status: "reversed", reversedBy: req.user.dbId, reversedAt: new Date(), reverseReason: reason });
+  await receipt.save({ session });
+  await resettle(bill, session);
+  bill.status = bill.settled.total > 0 ? "part_paid" : "issued";
+  bill.paidAt = null;
+  await bill.save({ session });
+  if (!receipt.batch) await audit(req, { action: "receipt.reverse", entity: "Receipt", entityId: receipt._id, before: { status: "active" }, after: { status: "reversed" }, note: reason }, session);
+  return { receipt, bill };
+}
 
 export const reverseReceipt = async (req, res) => {
   const id = objectId(req.params.id);
@@ -387,26 +502,11 @@ export const reverseReceipt = async (req, res) => {
   const out = await inTransaction(async (session) => {
     const receipt = await Receipt.findById(id).session(session);
     if (!receipt) throw new HttpError(404, "Receipt not found.");
-    if (receipt.status === "reversed") throw new HttpError(409, "Already reversed.");
-    const bill = await Bill.findById(receipt.bill).session(session);
-    if (bill.status === "paid") {
-      const taken = await Distribution.findOne({ bill: bill._id, statement: t({ $ne: null }) }).populate("statement", "number").session(session);
-      if (taken) throw new HttpError(409, `This bill's money is already in remuneration statement ${taken.statement?.number}. Cancel that statement first.`);
-      await Distribution.deleteMany({ bill: bill._id }, { session });
-      const projects = await Project.find({ _id: t({ $in: bill.lines.map((l) => l.project) }), status: "paid" }).session(session);
-      for (const p of projects) {
-        pushStatus(p, "billed", req.user.dbId, `Receipt ${receipt.number} reversed: ${reason}`);
-        await p.save({ session });
-      }
+    if (receipt.batch) {
+      const g = await BillGroup.findById(receipt.group).select("number").session(session).lean();
+      throw new HttpError(409, `This cheque was recorded on Statement of Bills ${g?.number || ""}. Reverse it there; it is undone on every bill together.`);
     }
-    Object.assign(receipt, { status: "reversed", reversedBy: req.user.dbId, reversedAt: new Date(), reverseReason: reason });
-    await receipt.save({ session });
-    await resettle(bill, session);
-    bill.status = bill.settled.total > 0 ? "part_paid" : "issued";
-    bill.paidAt = null;
-    await bill.save({ session });
-    await audit(req, { action: "receipt.reverse", entity: "Receipt", entityId: receipt._id, before: { status: "active" }, after: { status: "reversed" }, note: reason }, session);
-    return { receipt, bill };
+    return undoReceipt(req, receipt, reason, session);
   });
   res.json({ success: true, data: out });
 };
@@ -427,7 +527,7 @@ export const listReceipts = async (req, res) => {
     filter.$or = [{ number: rx }, { instrumentNo: rx }, { bankName: rx }];
   }
   const [items, total, sums] = await Promise.all([
-    Receipt.find(filter).populate("party", "code").populate("bill", "number").populate("recordedBy", "name").sort({ receivedOn: -1, createdAt: -1 }).skip(skip).limit(limit).lean(),
+    Receipt.find(filter).populate("party", "code").populate("bill", "number").populate("group", "number").populate("recordedBy", "name").sort({ receivedOn: -1, createdAt: -1 }).skip(skip).limit(limit).lean(),
     Receipt.countDocuments(filter),
     Receipt.aggregate([
       { $match: { ...filter, status: "active" } },
@@ -767,6 +867,7 @@ export const overview = async (req, res) => {
 const SETTINGS_FIELDS = {
   orgName: 200, orgSubtitle: 200, address: 500, phone: 40, gstin: 15, pan: 10, sacCode: 10,
   bankName: 120, bankBranch: 120, accountName: 120, accountNo: 30, ifsc: 11, billNote: 500, billSignatory: 80,
+  billPrefix: 80, groupSignatory: 80,
 };
 
 export const readSettings = async (req, res) => {

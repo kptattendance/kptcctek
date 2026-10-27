@@ -1,7 +1,8 @@
 "use client";
 
 // Ready to bill: jobs whose report is issued and that are on no bill yet.
-// Tick the jobs of one party -> "Create bill" makes a draft to check and issue.
+// Tick the jobs of one party -> "Create bill" makes draft bills to check and
+// issue: one bill per application (usual), or one bill for all of them.
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -10,7 +11,7 @@ import { useApi, formatRupees } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { useFetch, fyOf } from "@/lib/billing";
 import DataTable, { FilterBar, FilterSearch, FilterSelect } from "@/app/components/table/DataTable";
-import { useParties } from "@/app/components/projects/useProjectList";
+import { useParties, useFunds, fundOptions } from "@/app/components/projects/useProjectList";
 import { fmtDate, daysSince, ageClass, isoToday } from "@/app/components/projects/projectMeta";
 import { Modal } from "@/app/components/projects/dialogs";
 import { PageHeader, Field, Button, inputCls } from "@/app/components/ui";
@@ -19,7 +20,8 @@ export default function ReadyToBillPage() {
   const api = useApi();
   const router = useRouter();
   const parties = useParties();
-  const [filters, setFilters] = useState({ party: "", q: "" });
+  const { funds } = useFunds();
+  const [filters, setFilters] = useState({ party: "", fund: "", q: "" });
   const { data, loading, reload } = useFetch("/billing/ready", filters);
   const rows = useMemo(() => data || [], [data]);
   const [picked, setPicked] = useState(() => new Set());
@@ -65,6 +67,7 @@ export default function ReadyToBillPage() {
     },
     { key: "appNo", header: "App no.", kn: "ಅರ್ಜಿ", render: (r) => <span className="font-semibold">{r.appNo}<span className="block text-xs font-normal text-cc-muted">{r.financialYear}</span></span> },
     { key: "party", header: "Party", kn: "ಸಂಸ್ಥೆ", render: (r) => r.party?.code },
+    { key: "fund", header: "Fund", kn: "ಅನುದಾನ", className: "max-w-[180px]", render: (r) => (r.fund ? <span className="line-clamp-1">{r.fund.name}</span> : <span className="text-cc-muted">—</span>) },
     { key: "ward", header: "Ward", kn: "ವಾರ್ಡ್", hideBelow: "md", render: (r) => r.ward || "—" },
     { key: "contractor", header: "Contractor", kn: "ಗುತ್ತಿಗೆದಾರ", hideBelow: "lg", className: "max-w-[220px]", render: (r) => <span className="line-clamp-1">{r.contractorName || "—"}</span> },
     { key: "cert", header: "Report", kn: "ವರದಿ", hideBelow: "md", render: (r) => <span>{r.report?.certificateNo || "—"}<span className="block text-xs text-cc-muted">{fmtDate(r.report?.issuedOn)}</span></span> },
@@ -77,9 +80,10 @@ export default function ReadyToBillPage() {
     <div className="mx-auto max-w-[1400px] space-y-5 pb-24">
       <PageHeader title="Ready to bill" kn="ಬಿಲ್ ಮಾಡಬೇಕಾದ ಅರ್ಜಿಗಳು" sub="Reports issued, not billed yet. Tick the jobs of one party and create the bill." />
 
-      <FilterBar active={Boolean(filters.party || filters.q)} onClear={() => setFilters({ party: "", q: "" })}>
+      <FilterBar active={Boolean(filters.party || filters.fund || filters.q)} onClear={() => setFilters({ party: "", fund: "", q: "" })}>
         <FilterSearch value={filters.q} onChange={(v) => setFilters((f) => ({ ...f, q: v }))} placeholder="App no., contractor, ward, report no.…" />
         <FilterSelect label="Party" kn="ಸಂಸ್ಥೆ" value={filters.party} onChange={(v) => setFilters((f) => ({ ...f, party: v }))} options={parties.map((p) => ({ value: p._id, label: p.code }))} />
+        <FilterSelect label="Fund" kn="ಅನುದಾನ" value={filters.fund} onChange={(v) => setFilters((f) => ({ ...f, fund: v }))} options={fundOptions(funds)} />
         {rows.length > 0 && (
           <button type="button" onClick={selectAllOfParty} className="cc-btn cc-press px-4 py-2.5 text-sm">
             Tick all of {party?.code || rows[0]?.party?.code}
@@ -111,14 +115,16 @@ export default function ReadyToBillPage() {
           party={party}
           rows={chosen}
           total={total}
+          funds={funds}
           onClose={() => setDialog(false)}
           onCreate={async (body) => {
             try {
               const res = await api.post("/billing/bills", { ...body, projectIds: chosen.map((r) => r._id) });
-              notifySuccess("Draft bill created. Check it and issue.");
+              const made = res.data.bills?.length || 1;
+              notifySuccess(made > 1 ? `${made} draft bills created. Open each one and issue it.` : "Draft bill created. Check it and issue.");
               setPicked(new Set());
               reload();
-              router.push(`/billing/bills/${res.data.data._id}`);
+              router.push(made > 1 ? "/billing/bills?tab=draft" : `/billing/bills/${res.data.data._id}`);
             } catch (err) {
               notifyError(err);
             }
@@ -129,24 +135,65 @@ export default function ReadyToBillPage() {
   );
 }
 
-function CreateBillDialog({ party, rows, total, onClose, onCreate }) {
+function CreateBillDialog({ party, rows, total, funds, onClose, onCreate }) {
   const [billDate, setBillDate] = useState(isoToday());
-  const [subject, setSubject] = useState(`Third party inspection charges - ${rows.length} application${rows.length > 1 ? "s" : ""}`);
+  const [separate, setSeparate] = useState(true);
+  const [subject, setSubject] = useState("");
+  const [fundId, setFundId] = useState("");
   const [remarks, setRemarks] = useState("");
   const [busy, setBusy] = useState(false);
   const mixed = new Set(rows.map((r) => r.financialYear)).size > 1;
+  const noFund = rows.filter((r) => !r.fund);
+  // with the missing fund filled in, are they all under one fund?
+  const fundsUsed = new Set(rows.map((r) => r.fund?._id || fundId || ""));
+  const oneBillBlocked = !separate && fundsUsed.size > 1;
+  const n = rows.length;
   return (
-    <Modal title={`New bill to ${party?.name || party?.code}`} onClose={onClose}>
+    <Modal title={`New bill${separate && n > 1 ? "s" : ""} to ${party?.name || party?.code}`} onClose={onClose}>
       <div className="space-y-4">
         <div className="rounded-lg bg-cc-primary-soft p-3 text-sm">
-          {rows.length} application{rows.length > 1 ? "s" : ""} · total <span className="font-bold tabular-nums">{formatRupees(total)}</span>
+          {n} application{n > 1 ? "s" : ""} · total <span className="font-bold tabular-nums">{formatRupees(total)}</span>
           {party?.gstMode === "exclusive" ? " (GST added on top)" : " (GST included in the fee)"}
           {mixed && <span className="mt-1 block text-cc-warn">Includes applications from more than one year.</span>}
         </div>
-        <Field label="Bill date" kn="ಬಿಲ್ ದಿನಾಂಕ" hint={`Bill number is given when you issue it (year ${fyOf(billDate || new Date())}).`}>
+        {n > 1 && (
+          <fieldset className="space-y-2">
+            <legend className="mb-1 text-xs font-semibold text-cc-muted">How many bills? · ಎಷ್ಟು ಬಿಲ್ಲುಗಳು</legend>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="radio" checked={separate} onChange={() => setSeparate(true)} className="mt-1 accent-[var(--cc-primary)]" />
+              <span>
+                <b>A separate bill for each application ({n} bills)</b>
+                <span className="block text-xs text-cc-muted">The usual way. Group them later in a Statement of Bills for one cheque.</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="radio" checked={!separate} onChange={() => setSeparate(false)} className="mt-1 accent-[var(--cc-primary)]" />
+              <span>
+                <b>One bill for all {n}</b>
+                <span className="block text-xs text-cc-muted">All must be under the same fund.</span>
+              </span>
+            </label>
+          </fieldset>
+        )}
+        {noFund.length > 0 && (
+          <Field
+            label={`Fund for ${noFund.length === n ? (n > 1 ? "these applications" : "this application") : `the ${noFund.length} without one`}`}
+            kn="ಅನುದಾನ"
+            hint="Saved on the application too. Bills are grouped by fund for one cheque."
+          >
+            <select value={fundId} onChange={(e) => setFundId(e.target.value)} className={inputCls}>
+              <option value="">No fund</option>
+              {funds.map((f) => (
+                <option key={f._id} value={f._id}>{f.name}</option>
+              ))}
+            </select>
+          </Field>
+        )}
+        {oneBillBlocked && <p className="text-sm font-semibold text-cc-bad">These applications are under different funds, so they can&apos;t be on one bill.</p>}
+        <Field label="Bill date" kn="ಬಿಲ್ ದಿನಾಂಕ" hint={`The bill number is given when you issue it (year ${fyOf(billDate || new Date())}).`}>
           <input type="date" value={billDate} max={isoToday()} onChange={(e) => setBillDate(e.target.value)} className={inputCls} />
         </Field>
-        <Field label="Subject" kn="ವಿಷಯ">
+        <Field label="Subject (optional)" kn="ವಿಷಯ" hint="Left empty: “Third party inspection charges - application …”">
           <input value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={300} className={inputCls} />
         </Field>
         <Field label="Remarks (optional)" kn="ಟಿಪ್ಪಣಿ">
@@ -157,13 +204,14 @@ function CreateBillDialog({ party, rows, total, onClose, onCreate }) {
           <Button
             primary
             busy={busy}
+            disabled={oneBillBlocked}
             onClick={async () => {
               setBusy(true);
-              await onCreate({ billDate, subject, remarks });
+              await onCreate({ billDate, subject, remarks, separate: separate || n === 1, fundId: fundId || undefined });
               setBusy(false);
             }}
           >
-            Create draft
+            {separate && n > 1 ? `Create ${n} drafts` : "Create draft"}
           </Button>
         </div>
       </div>

@@ -21,6 +21,22 @@ export const STATEMENT_STATUS = {
   cancelled: { label: "Cancelled", short: "Cancelled", kn: "ರದ್ದು", cls: "bg-red-100 text-red-900" },
 };
 
+export const GROUP_STATUS = {
+  issued: { label: "Sent · unpaid", kn: "ಬಾಕಿ", cls: "bg-amber-100 text-amber-900" },
+  part_paid: { label: "Part paid", kn: "ಭಾಗಶಃ ಪಾವತಿ", cls: "bg-sky-100 text-sky-900" },
+  paid: { label: "Paid", kn: "ಪಾವತಿಯಾಗಿದೆ", cls: "bg-emerald-100 text-emerald-900" },
+  cancelled: { label: "Cancelled", kn: "ರದ್ದು", cls: "bg-red-100 text-red-900" },
+};
+
+// The fund in the list that a letter's wording means ("2025-26 ನೇ ಸಾಲಿನ ಮ.ನ.ಪಾ
+// ಸಾಮಾನ್ಯ ನಿಧಿ" -> ಮನಪಾ ಸಾಮಾನ್ಯ ನಿಧಿ). Spaces and dots are ignored.
+export function matchFund(text, funds) {
+  const squash = (s) => String(s || "").replace(/[\s.]/g, "");
+  const t = squash(text);
+  if (!t) return null;
+  return funds.find((f) => [f.name, ...(f.keywords || [])].some((k) => squash(k) && t.includes(squash(k)))) || null;
+}
+
 export const RECEIPT_MODES = [
   { value: "cheque", label: "Cheque" },
   { value: "dd", label: "Demand draft" },

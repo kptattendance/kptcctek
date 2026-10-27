@@ -17,13 +17,15 @@ import { notifyError, notifySuccess, notifyInfo, notifyWarning } from "@/lib/not
 import { parseMccLetter } from "@/lib/parseMccLetter";
 import { bestMatches, transliterate } from "@/lib/kannada";
 import { readLetterText } from "@/lib/readLetter";
+import { matchFund } from "@/lib/billing";
+import { useFunds } from "@/app/components/projects/useProjectList";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
 const EMPTY = {
   partyId: "", appNo: "", appDate: today(), ledgerNo: "", pageNo: "",
   letterRefNo: "", letterDate: "", ward: "", fileNo: "", workYear: "", mbNo: "",
-  workType: "civil", appDetails: "", fundSource: "", workStartedOn: "", workCompletedOn: "",
+  workType: "civil", appDetails: "", fundId: "", fundSource: "", workStartedOn: "", workCompletedOn: "",
   contractorName: "", contractorOnLetter: "",
   partyEngineer: "", engineerOnLetter: "", partyEngineerDesignation: "", partyEngineerPhone: "",
   estimateAmount: "", projectBillAmount: "", km: "", gstMode: "", lumpsum: false, lumpsumFee: "", remarks: "",
@@ -31,7 +33,7 @@ const EMPTY = {
 
 // Parser / AI field -> form field (for the amber "check" tags)
 const FLAG_MAP = {
-  partyCode: "partyId", partyNameAsWritten: "partyId", workDescription: "appDetails",
+  partyCode: "partyId", partyNameAsWritten: "partyId", workDescription: "appDetails", fundSource: "fundId",
   contractorRaw: "contractorName", contractorName: "contractorName",
   engineerRaw: "partyEngineer", engineerName: "partyEngineer", engineerDesignation: "partyEngineerDesignation",
 };
@@ -111,6 +113,7 @@ export default function IncomingApplication() {
   const fileRef = useRef(null);
 
   const [parties, setParties] = useState([]);
+  const { funds } = useFunds();
   const [directory, setDirectory] = useState({ contractors: [], engineers: [] });
   const [form, setForm] = useState(EMPTY);
   const [step, setStep] = useState("capture"); // capture | reading | review | saved
@@ -223,6 +226,9 @@ export default function IncomingApplication() {
     const engineer = x.engineerRaw ? pickName(x.engineerRaw, directory.engineers) : null;
     if (contractor && !contractor.sure) flagged.add("contractorName");
     if (engineer && !engineer.sure) flagged.add("partyEngineer");
+    // the letter names a fund: pick it from the list, or ask staff to choose
+    const fund = matchFund(x.fundSource, funds);
+    if (x.fundSource && !fund) flagged.add("fundId");
 
     setForm((f) => ({
       ...f,
@@ -234,6 +240,7 @@ export default function IncomingApplication() {
       workType: x.workType || f.workType,
       appDetails: x.workDescription || f.appDetails,
       fundSource: x.fundSource || f.fundSource,
+      fundId: fund?._id || f.fundId,
       workStartedOn: x.workStartedOn || f.workStartedOn,
       workCompletedOn: x.workCompletedOn || f.workCompletedOn,
       estimateAmount: x.estimateAmount != null ? String(x.estimateAmount) : f.estimateAmount,
@@ -592,8 +599,18 @@ export default function IncomingApplication() {
                 <Field label="Ward" kn="ವಾರ್ಡ್ ನಂ." flagged={flags.has("ward")}>
                   <input value={form.ward} onChange={set("ward")} inputMode="numeric" className={inputCls(flags.has("ward"))} />
                 </Field>
-                <Field label="Fund" kn="ಅನುದಾನ" flagged={flags.has("fundSource")}>
-                  <input value={form.fundSource} onChange={set("fundSource")} className={inputCls(flags.has("fundSource"))} />
+                <Field
+                  label="Fund"
+                  kn="ಅನುದಾನ"
+                  flagged={flags.has("fundId")}
+                  hint={form.fundSource ? `On the letter: ${form.fundSource}` : "Bills are grouped by fund for one cheque."}
+                >
+                  <select value={form.fundId} onChange={set("fundId")} className={inputCls(flags.has("fundId"))}>
+                    <option value="">Not known / none</option>
+                    {funds.map((f) => (
+                      <option key={f._id} value={f._id}>{f.name}{f.nameEn ? ` · ${f.nameEn}` : ""}</option>
+                    ))}
+                  </select>
                 </Field>
                 <Field label="File / work order no." kn="ಅ.ಪ. ನಂಬ್ರ" flagged={flags.has("fileNo")}>
                   <input value={form.fileNo} onChange={set("fileNo")} className={inputCls(flags.has("fileNo"))} />

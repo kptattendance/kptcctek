@@ -9,6 +9,8 @@
 import mongoose from "mongoose";
 import Project from "../models/Project.js";
 import Bill from "../models/Bill.js";
+import BillGroup from "../models/BillGroup.js";
+import Fund from "../models/Fund.js";
 import Receipt from "../models/Receipt.js";
 import Distribution from "../models/Distribution.js";
 import RemunerationStatement from "../models/RemunerationStatement.js";
@@ -70,6 +72,13 @@ const ACTION_TEXT = {
   "bill.cancel": "cancelled bill",
   "receipt.create": "recorded payment",
   "receipt.reverse": "reversed payment",
+  "group.create": "made statement of bills",
+  "group.receipt": "recorded cheque on statement",
+  "group.reverse": "reversed cheque on statement",
+  "group.sent": "marked statement sent",
+  "group.cancel": "cancelled statement of bills",
+  "fund.create": "added fund",
+  "fund.update": "updated fund",
   "statement.create": "prepared statement",
   "statement.approve": "approved statement",
   "statement.disburse": "marked paid out",
@@ -96,18 +105,24 @@ async function recentActivity(limit = 15) {
     RemunerationStatement.find({ _id: t({ $in: ids("RemunerationStatement") }) }).select("number month").lean(),
     User.find({ _id: t({ $in: ids("User") }) }).select("name").lean(),
   ]);
+  const [groups, funds] = await Promise.all([
+    BillGroup.find({ _id: t({ $in: ids("BillGroup") }) }).select("number fundName").lean(),
+    Fund.find({ _id: t({ $in: ids("Fund") }) }).select("name").lean(),
+  ]);
   const label = new Map([
     ...projects.map((x) => [String(x._id), { text: x.appNo, href: null, projectId: String(x._id) }]),
     ...bills.map((x) => [String(x._id), { text: x.number || `draft (${x.partySnapshot?.code || ""})`, href: `/billing/bills/${x._id}` }]),
     ...receipts.map((x) => [String(x._id), { text: `${x.number} · ${x.instrumentNo}` }]),
     ...statements.map((x) => [String(x._id), { text: x.number, href: `/billing/distribution/${x._id}` }]),
     ...users.map((x) => [String(x._id), { text: x.name }]),
+    ...groups.map((x) => [String(x._id), { text: `${x.number}${x.fundName ? ` · ${x.fundName}` : ""}`, href: `/billing/groups/${x._id}` }]),
+    ...funds.map((x) => [String(x._id), { text: x.name }]),
   ]);
   return rows.map((r) => {
     const target = label.get(String(r.entityId)) || {};
     let detail = "";
     if (r.action === "project.status" && r.after?.status) detail = `→ ${String(r.after.status).replace("_", " ")}`;
-    if (r.action === "receipt.create" && r.after?.amount) detail = `₹${(r.after.amount / 100).toLocaleString("en-IN")}`;
+    if (["receipt.create", "group.receipt"].includes(r.action) && r.after?.amount) detail = `₹${(r.after.amount / 100).toLocaleString("en-IN")}${r.after.instrumentNo ? ` · ${r.after.instrumentNo}` : ""}`;
     return {
       _id: r._id,
       at: r.createdAt,

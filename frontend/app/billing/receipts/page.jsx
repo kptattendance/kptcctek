@@ -41,7 +41,18 @@ export default function ReceiptsPage() {
       ),
     },
     { key: "bank", header: "Bank", kn: "ಬ್ಯಾಂಕ್", hideBelow: "lg", render: (r) => r.bankName || "—" },
-    { key: "bill", header: "Bill", kn: "ಬಿಲ್", hideBelow: "md", render: (r) => r.bill?.number },
+    {
+      key: "bill",
+      header: "Bill",
+      kn: "ಬಿಲ್",
+      hideBelow: "md",
+      render: (r) => (
+        <span className="break-all">
+          {r.bill?.number}
+          {r.group?.number && <span className="block text-xs text-cc-muted">via {r.group.number}</span>}
+        </span>
+      ),
+    },
     { key: "amount", header: "Amount", kn: "ಮೊತ್ತ", className: "text-right tabular-nums whitespace-nowrap font-semibold", render: (r) => formatRupees(r.amount) },
     { key: "tds", header: "TDS", kn: "ಟಿಡಿಎಸ್", hideBelow: "lg", className: "text-right tabular-nums whitespace-nowrap", render: (r) => (r.tdsIncomeTax + r.tdsGst ? formatRupees(r.tdsIncomeTax + r.tdsGst) : "—") },
     {

@@ -107,7 +107,8 @@ const projectSchema = new mongoose.Schema(
     partyEngineerPhone: { type: String, trim: true, default: "" },
 
     // From the request letter's table
-    fundSource: { type: String, trim: true, default: "" }, // ಅನುದಾನ
+    fundSource: { type: String, trim: true, default: "" }, // ಅನುದಾನ, as written on the letter
+    fund: { type: mongoose.Schema.Types.ObjectId, ref: "Fund", default: null, index: true }, // chosen from the list
     estimateAmount: { type: Number, min: 0, default: null }, // ಅಂದಾಜು ಮೊತ್ತ, paise
     workStartedOn: { type: Date, default: null }, // ಪ್ರಾರಂಭಿಸಿದ ದಿನಾಂಕ
     workCompletedOn: { type: Date, default: null }, // ಪೂರ್ಣಗೊಂಡ ದಿನಾಂಕ

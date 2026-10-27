@@ -8,6 +8,7 @@ import { uploadScanFile } from "../middlewares/uploadScan.js";
 import {
   listParties, getDirectory, scanInward, coordinatorSummary, assignTeam, changeStatus, mySummary, getScanUrl, nextNumbers, previewCharges, createProject, listProjects, getProject,
 } from "../controllers/projectController.js";
+import { getFunds } from "../controllers/billGroupController.js";
 
 const router = express.Router();
 router.use(authenticateUser);
@@ -25,6 +26,7 @@ const scanLimit = rateLimit({
 const canCreate = requirePermission("projects.create");
 
 router.get("/parties", listParties);
+router.get("/funds", getFunds); // active funds, for the application form
 router.post("/scan", canCreate, scanLimit, uploadScanFile, scanInward);
 router.get("/scans/:scanId/url", getScanUrl);
 router.get("/next-numbers", canCreate, nextNumbers);

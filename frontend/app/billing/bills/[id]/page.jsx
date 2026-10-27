@@ -10,9 +10,10 @@ import { ArrowLeft, Printer, Send, Wallet, Ban, BadgeCheck, Undo2 } from "lucide
 import { useApi, formatRupees } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { useMe } from "@/lib/useMe";
-import { useFetch, BILL_STATUS, Badge, can, amountInWords, RECEIPT_MODES, toRupeesInput } from "@/lib/billing";
+import { useFetch, BILL_STATUS, Badge, can, amountInWords, RECEIPT_MODES } from "@/lib/billing";
 import { fmtDate, isoToday } from "@/app/components/projects/projectMeta";
 import { Modal } from "@/app/components/projects/dialogs";
+import ReceiptDialog from "@/app/components/billing/ReceiptDialog";
 import { Button, ConfirmDialog, Field, inputCls, StatCard, Card, Spinner, Empty } from "@/app/components/ui";
 
 export default function BillPage() {
@@ -36,6 +37,7 @@ function BillView() {
   const prepare = can(me, "billing.prepare");
   const receipts = can(me, "receipts.manage");
   const open = ["issued", "part_paid"].includes(bill.status);
+  const group = bill.group && bill.group.status !== "cancelled" ? bill.group : null; // paid through its Statement of Bills
 
   const post = async (path, body, ok) => {
     try {
@@ -58,7 +60,8 @@ function BillView() {
           <div>
             <h1 className="text-xl font-bold">{bill.number || "Draft bill"}</h1>
             <p className="text-sm text-cc-muted">
-              {bill.party?.code} · {bill.lines.length} application{bill.lines.length > 1 ? "s" : ""} · <Badge map={BILL_STATUS} status={bill.status} />
+              {bill.party?.code}
+              {bill.fundName ? ` · ${bill.fundName}` : ""} · {bill.lines.length} application{bill.lines.length > 1 ? "s" : ""} · <Badge map={BILL_STATUS} status={bill.status} />
             </p>
           </div>
         </div>
@@ -76,12 +79,12 @@ function BillView() {
               <Send size={16} aria-hidden /> {bill.sentOn ? "Edit dispatch" : "Mark sent"}
             </Button>
           )}
-          {receipts && open && (
+          {receipts && open && !group && (
             <Button primary onClick={() => setDialog("receipt")}>
               <Wallet size={16} aria-hidden /> Record cheque
             </Button>
           )}
-          {prepare && ["draft", "issued"].includes(bill.status) && !bill.settled?.total && (
+          {prepare && ["draft", "issued"].includes(bill.status) && !bill.settled?.total && !group && (
             <Button onClick={() => setDialog("cancel")} className="!text-cc-bad">
               <Ban size={16} aria-hidden /> Cancel
             </Button>
@@ -92,6 +95,15 @@ function BillView() {
       {bill.status === "draft" && (
         <p className="no-print rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           This is a draft. Check the details and the party&apos;s address, then <b>Issue bill</b> to give it a number. Wrong jobs? Cancel the draft; they go back to Ready to bill.
+        </p>
+      )}
+      {group && (
+        <p className="no-print rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+          On Statement of Bills{" "}
+          <Link href={`/billing/groups/${group._id}`} className="font-bold underline">
+            {group.number}
+          </Link>
+          . {open ? "Record the party's cheque on the statement; it is entered on this bill automatically." : "Paid through that statement."}
         </p>
       )}
       {bill.status === "cancelled" && (
@@ -137,6 +149,8 @@ function BillView() {
                   <td className="px-4 py-2 text-right no-underline">
                     {r.status === "reversed" ? (
                       <span className="text-xs" title={r.reverseReason}>Reversed</span>
+                    ) : r.batch ? (
+                      <span className="text-xs text-cc-muted">via statement</span>
                     ) : (
                       receipts && (
                         <button type="button" onClick={() => setDialog({ reverse: r })} className="inline-flex items-center gap-1 text-xs font-semibold text-cc-bad hover:underline">
@@ -156,7 +170,9 @@ function BillView() {
         <IssueDialog bill={bill} onClose={() => setDialog(null)} onSave={(body) => post("/issue", body, "Bill issued. Print it and send it to the party.")} />
       )}
       {dialog === "sent" && <SentDialog bill={bill} onClose={() => setDialog(null)} onSave={(body) => post("/sent", body, "Dispatch details saved.")} />}
-      {dialog === "receipt" && <ReceiptDialog bill={bill} onClose={() => setDialog(null)} onSave={(body) => post("/receipts", body, "Payment recorded.")} />}
+      {dialog === "receipt" && (
+        <ReceiptDialog title={`Record payment · ${bill.number}`} due={bill.outstanding} onClose={() => setDialog(null)} onSave={(body) => post("/receipts", body, "Payment recorded.")} />
+      )}
       {dialog === "cancel" && (
         <ConfirmDialog
           title="Cancel this bill?"
@@ -244,6 +260,18 @@ function BillDocument({ bill, settings }) {
         <span className="text-gray-500">Subject: </span>
         {bill.subject}
       </p>
+      {refs(bill.lines) && (
+        <p>
+          <span className="text-gray-500">Ref. · ಉಲ್ಲೇಖ: </span>
+          {refs(bill.lines)}
+        </p>
+      )}
+      {bill.fundName && (
+        <p>
+          <span className="text-gray-500">Fund · ಅನುದಾನ: </span>
+          {bill.fundName}
+        </p>
+      )}
 
       <div className="mt-3 overflow-x-auto">
         <table className="w-full min-w-[600px] border-collapse text-[12px]">
@@ -252,6 +280,7 @@ function BillDocument({ bill, settings }) {
               <th className="border border-gray-300 px-2 py-1.5">Sl.</th>
               <th className="border border-gray-300 px-2 py-1.5">Application</th>
               <th className="border border-gray-300 px-2 py-1.5">Work / Contractor</th>
+              <th className="border border-gray-300 px-2 py-1.5 text-right">Estimate (₹)</th>
               <th className="border border-gray-300 px-2 py-1.5 text-right">Work bill (₹)</th>
               <th className="border border-gray-300 px-2 py-1.5 text-right">Rate</th>
               <th className="border border-gray-300 px-2 py-1.5 text-right">Fee (₹)</th>
@@ -272,6 +301,7 @@ function BillDocument({ bill, settings }) {
                     {[l.ward && `Ward ${l.ward}`, l.fileNo && `File ${l.fileNo}${l.workYear ? `/${l.workYear}` : ""}`, l.contractorName].filter(Boolean).join(" · ")}
                   </span>
                 </td>
+                <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">{l.estimateAmount != null ? plain(l.estimateAmount) : "—"}</td>
                 <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">{plain(l.projectBillAmount)}</td>
                 <td className="border border-gray-300 px-2 py-1.5 text-right">{l.lumpsum ? "Lumpsum" : `${l.servicePercent}%`}</td>
                 <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">{plain(l.net)}</td>
@@ -280,19 +310,19 @@ function BillDocument({ bill, settings }) {
           </tbody>
           <tfoot className="font-semibold">
             <tr>
-              <td colSpan={5} className="border border-gray-300 px-2 py-1.5 text-right">Taxable value</td>
+              <td colSpan={6} className="border border-gray-300 px-2 py-1.5 text-right">Taxable value</td>
               <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">{plain(bill.totals.net)}</td>
             </tr>
             <tr>
-              <td colSpan={5} className="border border-gray-300 px-2 py-1.5 text-right">CGST @ {halfRate}%</td>
+              <td colSpan={6} className="border border-gray-300 px-2 py-1.5 text-right">CGST @ {halfRate}%</td>
               <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">{plain(bill.totals.cgst)}</td>
             </tr>
             <tr>
-              <td colSpan={5} className="border border-gray-300 px-2 py-1.5 text-right">SGST @ {halfRate}%</td>
+              <td colSpan={6} className="border border-gray-300 px-2 py-1.5 text-right">SGST @ {halfRate}%</td>
               <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">{plain(bill.totals.sgst)}</td>
             </tr>
             <tr className="bg-cc-primary-soft text-[13px] print:bg-gray-100">
-              <td colSpan={5} className="border border-gray-300 px-2 py-2 text-right">Total payable</td>
+              <td colSpan={6} className="border border-gray-300 px-2 py-2 text-right">Total payable</td>
               <td className="border border-gray-300 px-2 py-2 text-right tabular-nums">{plain(bill.totals.total)}</td>
             </tr>
           </tfoot>
@@ -327,22 +357,39 @@ function BillDocument({ bill, settings }) {
 
 const plain = (paise) => (Number(paise || 0) / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+// "Your letter no. X dt. Y" for each application that has one
+const refs = (lines) =>
+  [...new Set(lines.filter((l) => l.letterRefNo).map((l) => `${l.letterRefNo}${l.letterDate ? ` dt. ${fmtDate(l.letterDate)}` : ""}`))].join("; ");
+
 // ---------------------------------------------------------------- dialogs
 
 function IssueDialog({ bill, onClose, onSave }) {
   const [billDate, setBillDate] = useState(bill.billDate?.slice(0, 10) || isoToday());
+  const [seq, setSeq] = useState(""); // empty = the next number
   const [sentOn, setSentOn] = useState("");
   const [dispatchRef, setDispatchRef] = useState("");
   const [busy, setBusy] = useState(false);
+  const next = useFetch("/billing/bills/next-number", { date: billDate || undefined }).data;
+  const number = next ? next.number.replace(/\d+$/, seq || String(next.seq)) : "";
   return (
     <Modal title="Issue bill" onClose={onClose}>
       <div className="space-y-4">
         <p className="text-sm text-cc-muted">
-          The bill gets the next number, and its {bill.lines.length} application{bill.lines.length > 1 ? "s are" : " is"} marked billed. Amount {formatRupees(bill.totals.total)}.
+          The bill gets its number, and its {bill.lines.length} application{bill.lines.length > 1 ? "s are" : " is"} marked billed. Amount {formatRupees(bill.totals.total)}.
         </p>
-        <Field label="Bill date" kn="ಬಿಲ್ ದಿನಾಂಕ">
-          <input type="date" value={billDate} max={isoToday()} onChange={(e) => setBillDate(e.target.value)} className={inputCls} />
-        </Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Bill date" kn="ಬಿಲ್ ದಿನಾಂಕ">
+            <input type="date" value={billDate} max={isoToday()} onChange={(e) => setBillDate(e.target.value)} className={inputCls} />
+          </Field>
+          <Field label="Running no." kn="ಕ್ರಮ ಸಂಖ್ಯೆ" hint={next ? `Next is ${next.seq}. Change it only to match the outward register.` : undefined}>
+            <input inputMode="numeric" value={seq} placeholder={next ? String(next.seq) : ""} onChange={(e) => setSeq(e.target.value.replace(/\D/g, "").slice(0, 6))} className={inputCls} />
+          </Field>
+        </div>
+        {number && (
+          <p className="rounded-lg bg-cc-primary-soft p-3 text-sm">
+            Bill no. <b className="break-all">{number}</b>
+          </p>
+        )}
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Sent on (optional)" kn="ಕಳುಹಿಸಿದ ದಿನ">
             <input type="date" value={sentOn} max={isoToday()} onChange={(e) => setSentOn(e.target.value)} className={inputCls} />
@@ -358,7 +405,7 @@ function IssueDialog({ bill, onClose, onSave }) {
             busy={busy}
             onClick={async () => {
               setBusy(true);
-              await onSave({ billDate, sentOn: sentOn || undefined, dispatchRef });
+              await onSave({ billDate, seq: seq || undefined, sentOn: sentOn || undefined, dispatchRef });
               setBusy(false);
             }}
           >
@@ -397,97 +444,6 @@ function SentDialog({ bill, onClose, onSave }) {
             }}
           >
             Save
-          </Button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-function ReceiptDialog({ bill, onClose, onSave }) {
-  const due = bill.outstanding;
-  const [f, setF] = useState({
-    mode: "cheque",
-    instrumentNo: "",
-    instrumentDate: "",
-    bankName: "",
-    receivedOn: isoToday(),
-    amount: toRupeesInput(due),
-    tdsIncomeTax: "",
-    tdsGst: "",
-    otherDeduction: "",
-    remarks: "",
-  });
-  const [busy, setBusy] = useState(false);
-  const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
-  const paise = (v) => Math.round(Number(v || 0) * 100);
-  const settles = paise(f.amount) + paise(f.tdsIncomeTax) + paise(f.tdsGst) + paise(f.otherDeduction);
-  const left = due - settles;
-  const cheque = ["cheque", "dd"].includes(f.mode);
-
-  return (
-    <Modal title={`Record payment · ${bill.number}`} onClose={onClose}>
-      <div className="space-y-4">
-        <p className="rounded-lg bg-cc-primary-soft p-3 text-sm">
-          Due on this bill: <b className="tabular-nums">{formatRupees(due)}</b>
-        </p>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Mode" kn="ವಿಧಾನ">
-            <select value={f.mode} onChange={set("mode")} className={inputCls}>
-              {RECEIPT_MODES.map((m) => (
-                <option key={m.value} value={m.value}>{m.label}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label={cheque ? "Cheque / DD no." : "UTR / reference no."} kn="ಸಂಖ್ಯೆ">
-            <input value={f.instrumentNo} onChange={set("instrumentNo")} maxLength={40} className={inputCls} autoFocus />
-          </Field>
-          <Field label={cheque ? "Cheque date" : "Transfer date"} kn="ದಿನಾಂಕ">
-            <input type="date" value={f.instrumentDate} onChange={set("instrumentDate")} className={inputCls} />
-          </Field>
-          <Field label="Bank" kn="ಬ್ಯಾಂಕ್">
-            <input value={f.bankName} onChange={set("bankName")} maxLength={120} className={inputCls} />
-          </Field>
-          <Field label="Received on" kn="ಸ್ವೀಕರಿಸಿದ ದಿನ">
-            <input type="date" value={f.receivedOn} max={isoToday()} onChange={set("receivedOn")} className={inputCls} />
-          </Field>
-          <Field label="Amount (₹)" kn="ಮೊತ್ತ">
-            <input inputMode="decimal" value={f.amount} onChange={set("amount")} className={`${inputCls} font-semibold tabular-nums`} />
-          </Field>
-        </div>
-        <details className="rounded-lg border border-cc-border p-3" open={Boolean(f.tdsIncomeTax || f.tdsGst || f.otherDeduction)}>
-          <summary className="cursor-pointer text-sm font-semibold">Deducted by the party (TDS etc.) · ಕಡಿತ</summary>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <Field label="Income-tax TDS (₹)">
-              <input inputMode="decimal" value={f.tdsIncomeTax} onChange={set("tdsIncomeTax")} className={inputCls} />
-            </Field>
-            <Field label="GST TDS (₹)">
-              <input inputMode="decimal" value={f.tdsGst} onChange={set("tdsGst")} className={inputCls} />
-            </Field>
-            <Field label="Other (₹)">
-              <input inputMode="decimal" value={f.otherDeduction} onChange={set("otherDeduction")} className={inputCls} />
-            </Field>
-          </div>
-        </details>
-        <Field label="Remarks" kn="ಟಿಪ್ಪಣಿ">
-          <input value={f.remarks} onChange={set("remarks")} maxLength={500} className={inputCls} />
-        </Field>
-        <p className={`text-sm font-semibold ${left < 0 ? "text-cc-bad" : left === 0 ? "text-cc-ok" : "text-cc-warn"}`}>
-          {left < 0 ? `This is ${formatRupees(-left)} more than is due.` : left === 0 ? "Settles the bill in full. Its money will be shared out automatically." : `${formatRupees(left)} will still be due (part payment).`}
-        </p>
-        <div className="flex justify-end gap-2">
-          <Button onClick={onClose}>Back</Button>
-          <Button
-            primary
-            busy={busy}
-            disabled={left < 0 || !f.instrumentNo || !f.instrumentDate || !f.amount}
-            onClick={async () => {
-              setBusy(true);
-              await onSave(f);
-              setBusy(false);
-            }}
-          >
-            Save payment
           </Button>
         </div>
       </div>

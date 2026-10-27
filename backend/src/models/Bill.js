@@ -6,6 +6,9 @@
 //             handed to distribution)
 //   draft / issued (nothing received) -> cancelled (applications go back to "ready to bill")
 //
+// Usually one application per bill. Issued bills of one party and one fund
+// are put on a Statement of Bills (BillGroup) and paid with one cheque there.
+//
 // Every line is a frozen copy of the application's fee, so a later change to
 // the application or the fee rule never changes a bill already sent.
 
@@ -26,6 +29,9 @@ const lineSchema = new mongoose.Schema(
     description: String,
     contractorName: String,
     certificateNo: String,
+    letterRefNo: String, // the party's letter (ಉಲ್ಲೇಖ)
+    letterDate: Date,
+    estimateAmount: { type: Number, default: null }, // ಅಂದಾಜು ಪಟ್ಟಿ ಮೊತ್ತ
     projectBillAmount: money,
     servicePercent: Number, // null when lumpsum
     lumpsum: Boolean,
@@ -41,12 +47,15 @@ const lineSchema = new mongoose.Schema(
 
 const billSchema = new mongoose.Schema(
   {
-    number: { type: String, default: null }, // set on issue
+    number: { type: String, default: null }, // set on issue: ಸಂ.ಕೆಪಿಎಂ/ಸಿಸಿಟೆಕ್/ಟಿ.ಪಿ.ಐ.ಆರ್/2026-27/12.04.2026/1459
     financialYear: { type: String, default: null },
-    seq: { type: Number, default: null },
+    seq: { type: Number, default: null }, // the running number at the end
     status: { type: String, enum: BILL_STATUSES, default: "draft", index: true },
 
     party: { type: mongoose.Schema.Types.ObjectId, ref: "Party", required: true, index: true },
+    fund: { type: mongoose.Schema.Types.ObjectId, ref: "Fund", default: null, index: true },
+    fundName: { type: String, default: "" },
+    group: { type: mongoose.Schema.Types.ObjectId, ref: "BillGroup", default: null, index: true }, // Statement of Bills
     // copy of the party at issue time (the printed bill must not change)
     partySnapshot: {
       code: String,
@@ -91,6 +100,8 @@ const billSchema = new mongoose.Schema(
 );
 
 billSchema.index({ number: 1 }, { unique: true, partialFilterExpression: { number: { $type: "string" } } });
+// the running number is unique within a year (the date in the number may differ)
+billSchema.index({ financialYear: 1, seq: 1 }, { unique: true, partialFilterExpression: { seq: { $type: "number" } } });
 billSchema.index({ financialYear: 1, status: 1 });
 billSchema.index({ billDate: -1 });
 

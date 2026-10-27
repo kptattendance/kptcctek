@@ -4,9 +4,11 @@
 // `actions(project)` renders the buttons the current screen allows.
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { X, FileText, LoaderCircle, ExternalLink } from "lucide-react";
 import { useApi, formatRupees } from "@/lib/api";
 import { notifyError } from "@/lib/notify";
+import { BILL_STATUS } from "@/lib/billing";
 import Avatar from "../users/Avatar";
 import { StatusBadge, STATUS, fmtDate, WORK_TYPES } from "./projectMeta";
 
@@ -106,7 +108,14 @@ export default function ProjectDrawer({ projectId, onClose, actions, refreshKey 
                 <Row label="Type" kn="ವಿಧ">{WORK_TYPES.find((w) => w.value === p.workType)?.label}</Row>
                 <Row label="Ward" kn="ವಾರ್ಡ್">{p.ward}</Row>
                 <Row label="Contractor" kn="ಗುತ್ತಿಗೆದಾರ">{p.contractorName}</Row>
-                <Row label="Fund" kn="ಅನುದಾನ">{p.fundSource}</Row>
+                <Row label="Fund" kn="ಅನುದಾನ">
+                  {p.fund?.name || p.fundSource ? (
+                    <>
+                      {p.fund?.name || "Not chosen"}
+                      {p.fundSource && p.fundSource !== p.fund?.name && <span className="block text-xs font-normal text-cc-muted">On the letter: {p.fundSource}</span>}
+                    </>
+                  ) : null}
+                </Row>
                 <Row label="Work order" kn="ಅ.ಪ. ನಂಬ್ರ">{[p.fileNo, p.workYear].filter(Boolean).join(" / ")}</Row>
                 <Row label="Work period" kn="ಕಾಮಗಾರಿ ಅವಧಿ">
                   {p.workStartedOn || p.workCompletedOn ? `${fmtDate(p.workStartedOn)} → ${fmtDate(p.workCompletedOn)}` : null}
@@ -156,6 +165,28 @@ export default function ProjectDrawer({ projectId, onClose, actions, refreshKey 
                   </>
                 )}
               </Section>
+
+              {p.billing?.bill && (
+                <Section title="Bill & payment · ಬಿಲ್ ಮತ್ತು ಪಾವತಿ">
+                  <Row label="Bill" kn="ಬಿಲ್">
+                    <Link href={`/billing/bills/${p.billing.bill._id}`} className="underline">{p.billing.bill.number || "Draft bill"}</Link>
+                    {p.billing.bill.billDate && <span className="block text-xs font-normal text-cc-muted">{fmtDate(p.billing.bill.billDate)} · {BILL_STATUS[p.billing.bill.status]?.label || p.billing.bill.status}</span>}
+                  </Row>
+                  <Row label="Statement of bills" kn="ಬಿಲ್ಲುಗಳ ಪಟ್ಟಿ">
+                    {p.billing.bill.group ? <Link href={`/billing/groups/${p.billing.bill.group._id}`} className="underline">{p.billing.bill.group.number}</Link> : null}
+                  </Row>
+                  {p.billing.receipts.map((r) => (
+                    <Row key={r._id} label={r.status === "reversed" ? "Cheque (reversed)" : "Cheque"} kn="ಚೆಕ್">
+                      <span className={r.status === "reversed" ? "text-cc-muted line-through" : ""}>
+                        {r.instrumentNo} · {fmtDate(r.instrumentDate)}
+                        <span className="block text-xs font-normal text-cc-muted">
+                          {formatRupees(r.amount)} received {fmtDate(r.receivedOn)}{r.bankName ? ` · ${r.bankName}` : ""}
+                        </span>
+                      </span>
+                    </Row>
+                  ))}
+                </Section>
+              )}
 
               {p.inward?.scan && (
                 <button type="button" onClick={openScan} disabled={opening} className="cc-chip cc-press flex w-full items-center justify-center gap-2 px-4 py-3 text-sm font-semibold">

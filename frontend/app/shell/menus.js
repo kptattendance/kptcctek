@@ -48,6 +48,7 @@ export const SECTIONS = [
     items: [
       { href: "/billing", label: "Ready to bill", kn: "ಬಿಲ್ ಮಾಡಬೇಕಾದವು", icon: "FilePlus2", roles: ["work_coordinator", "office_staff", "manager", "accounts"] },
       { href: "/billing/bills", label: "Bills", kn: "ಬಿಲ್‌ಗಳು", icon: "FileText" },
+      { href: "/billing/groups", label: "Statements of bills", kn: "ಬಿಲ್ಲುಗಳ ಪಟ್ಟಿ", icon: "Layers" },
       { href: "/billing/receipts", label: "Cheques received", kn: "ಸ್ವೀಕರಿಸಿದ ಚೆಕ್‌ಗಳು", icon: "Wallet" },
       { href: "/billing/distribution", label: "Distribution", kn: "ಹಂಚಿಕೆ", icon: "HandCoins" },
       { href: "/billing/settings", label: "Bill settings", kn: "ಬಿಲ್ ವಿವರಗಳು", icon: "Settings", roles: ["manager"] },

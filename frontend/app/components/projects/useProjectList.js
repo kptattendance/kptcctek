@@ -89,3 +89,31 @@ export function useParties() {
   }, [api]);
   return parties;
 }
+
+// Active funds (ಅನುದಾನ) for dropdowns and filters. `refresh()` after the list
+// is edited in Bill settings.
+let fundsPromise = null;
+export function useFunds() {
+  const api = useApi();
+  const [funds, setFunds] = useState([]);
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    fundsPromise ??= api.get("/projects/funds").then((r) => r.data.data).catch((e) => {
+      fundsPromise = null;
+      throw e;
+    });
+    let cancelled = false;
+    fundsPromise.then((f) => !cancelled && setFunds(f)).catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [api, tick]);
+  const refresh = useCallback(() => {
+    fundsPromise = null;
+    setTick((n) => n + 1);
+  }, []);
+  return { funds, refresh };
+}
+
+// Filter options: every fund plus "no fund".
+export const fundOptions = (funds) => [...funds.map((f) => ({ value: f._id, label: f.name })), { value: "none", label: "No fund" }];
