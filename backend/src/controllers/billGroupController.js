@@ -16,7 +16,7 @@ import { nextSequence, financialYear } from "../models/Counter.js";
 import { audit } from "../models/AuditLog.js";
 import { DEFAULT_RULE } from "../services/billingService.js";
 import { inTransaction, fundFilter, readReceiptInput, applyReceipt, undoReceipt } from "./billingController.js";
-import { HttpError, str, date, objectId, paging, bool } from "../utils/validate.js";
+import { HttpError, str, num, date, objectId, paging, bool } from "../utils/validate.js";
 
 const t = mongoose.trusted;
 const pad = (n, w) => String(n).padStart(w, "0");
@@ -72,10 +72,12 @@ export const getFunds = async (req, res) => {
 
 function readFund(b) {
   const keywords = Array.isArray(b.keywords) ? b.keywords : String(b.keywords || "").split(",");
+  const order = num(b.order, { name: "Position", min: 1, max: 999 });
   return {
     name: str(b.name, { name: "Fund name", required: true, max: 120 }),
     nameEn: str(b.nameEn, { name: "English name", max: 120 }) || "",
     keywords: keywords.map((k) => str(k, { name: "Keyword", max: 60 })).filter(Boolean).slice(0, 10),
+    ...(order !== undefined ? { order: Math.round(order) } : {}),
   };
 }
 

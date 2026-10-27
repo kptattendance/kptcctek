@@ -101,6 +101,7 @@ export default function BillSettingsPage() {
         <table className="w-full min-w-[560px] text-sm">
           <thead className="bg-cc-subtle text-left text-xs text-cc-muted">
             <tr>
+              <th className="px-4 py-2 w-12">No.</th>
               <th className="px-4 py-2">Fund (as printed)</th>
               <th className="px-4 py-2">Words on a letter that mean it</th>
               <th className="px-4 py-2">Status</th>
@@ -110,6 +111,7 @@ export default function BillSettingsPage() {
           <tbody>
             {(funds.data || []).map((f) => (
               <tr key={f._id} className={`border-t border-cc-border align-top ${f.isActive ? "" : "text-cc-muted"}`}>
+                <td className="px-4 py-2 tabular-nums">{f.order}</td>
                 <td className="px-4 py-2">
                   <span className="font-semibold">{f.name}</span>
                   {f.nameEn && <span className="block text-xs text-cc-muted">{f.nameEn}</span>}
@@ -208,6 +210,7 @@ function FundDialog({ fund, onClose, onSaved }) {
     name: fund.name || "",
     nameEn: fund.nameEn || "",
     keywords: (fund.keywords || []).join(", "),
+    order: fund.order ? String(fund.order) : "",
     isActive: fund.isActive !== false,
   });
   const [busy, setBusy] = useState(false);
@@ -218,9 +221,14 @@ function FundDialog({ fund, onClose, onSaved }) {
         <Field label="Fund name (as printed on the statement)" kn="ಹೆಸರು" hint="e.g. ಮನಪಾ ಸಾಮಾನ್ಯ ನಿಧಿ">
           <input value={f.name} onChange={set("name")} maxLength={120} className={inputCls} />
         </Field>
-        <Field label="English name (optional)" kn="ಇಂಗ್ಲಿಷ್ ಹೆಸರು">
-          <input value={f.nameEn} onChange={set("nameEn")} maxLength={120} className={inputCls} />
-        </Field>
+        <div className="grid gap-3 sm:grid-cols-[1fr_8rem]">
+          <Field label="English name (optional)" kn="ಇಂಗ್ಲಿಷ್ ಹೆಸರು">
+            <input value={f.nameEn} onChange={set("nameEn")} maxLength={120} className={inputCls} />
+          </Field>
+          <Field label="Position in list" kn="ಕ್ರಮ">
+            <input inputMode="numeric" value={f.order} onChange={(e) => setF((x) => ({ ...x, order: e.target.value.replace(/\D/g, "").slice(0, 3) }))} placeholder="last" className={inputCls} />
+          </Field>
+        </div>
         <Field label="Words on a letter that mean this fund (comma separated)" kn="ಪತ್ರದಲ್ಲಿನ ಪದಗಳು" hint="Used to choose the fund by itself when a letter is scanned, e.g. ಸಾಮಾನ್ಯ ನಿಧಿ">
           <input value={f.keywords} onChange={set("keywords")} className={inputCls} />
         </Field>
@@ -239,7 +247,7 @@ function FundDialog({ fund, onClose, onSaved }) {
             onClick={async () => {
               setBusy(true);
               try {
-                const body = { ...f, keywords: f.keywords.split(",").map((s) => s.trim()).filter(Boolean) };
+                const body = { ...f, order: f.order || undefined, keywords: f.keywords.split(",").map((s) => s.trim()).filter(Boolean) };
                 if (isNew) await api.post("/billing/funds", body);
                 else await api.put(`/billing/funds/${fund._id}`, body);
                 notifySuccess("Fund saved.");

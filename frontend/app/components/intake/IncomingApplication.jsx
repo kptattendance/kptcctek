@@ -603,14 +603,23 @@ export default function IncomingApplication() {
                   label="Fund"
                   kn="ಅನುದಾನ"
                   flagged={flags.has("fundId")}
-                  hint={form.fundSource ? `On the letter: ${form.fundSource}` : "Bills are grouped by fund for one cheque."}
+                  hint={form.fundId && form.fundSource ? `On the letter: ${form.fundSource}` : "Bills are grouped by fund for one cheque."}
                 >
                   <select value={form.fundId} onChange={set("fundId")} className={inputCls(flags.has("fundId"))}>
-                    <option value="">Not known / none</option>
+                    <option value="">{funds.length ? "Choose the fund…" : "Loading funds…"}</option>
                     {funds.map((f) => (
                       <option key={f._id} value={f._id}>{f.name}{f.nameEn ? ` · ${f.nameEn}` : ""}</option>
                     ))}
                   </select>
+                  {!form.fundId && (
+                    <input
+                      value={form.fundSource}
+                      onChange={set("fundSource")}
+                      placeholder="Not in the list? Type it as on the letter"
+                      aria-label="Fund as written on the letter"
+                      className={`${inputCls(false)} mt-2`}
+                    />
+                  )}
                 </Field>
                 <Field label="File / work order no." kn="ಅ.ಪ. ನಂಬ್ರ" flagged={flags.has("fileNo")}>
                   <input value={form.fileNo} onChange={set("fileNo")} className={inputCls(flags.has("fileNo"))} />
