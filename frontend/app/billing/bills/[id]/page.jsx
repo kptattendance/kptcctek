@@ -10,7 +10,7 @@ import { ArrowLeft, Printer, Send, Wallet, Ban, BadgeCheck, Undo2 } from "lucide
 import { useApi, formatRupees } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { useMe } from "@/lib/useMe";
-import { useFetch, BILL_STATUS, Badge, can, amountInWords, RECEIPT_MODES } from "@/lib/billing";
+import { useFetch, BILL_STATUS, Badge, can, amountInKannada, RECEIPT_MODES } from "@/lib/billing";
 import { fmtDate, isoToday } from "@/app/components/projects/projectMeta";
 import { Modal } from "@/app/components/projects/dialogs";
 import ReceiptDialog from "@/app/components/billing/ReceiptDialog";
@@ -210,145 +210,133 @@ function BillView() {
 
 // ---------------------------------------------------------------- the bill itself
 
+// Laid out like the paper "3ನೇ ಪಾರ್ಟಿ ತಪಾಸಣಾ ಬಿಲ್ಲು": letterhead, number and date,
+// addressee, the party's letter as ಉಲ್ಲೇಖ, one row per work, total in Kannada
+// words, signature. A fee with GST added on top shows the GST rows too.
 function BillDocument({ bill, settings }) {
   const s = settings;
   // a draft shows the party as it is now; an issued bill shows the copy taken at issue
   const p = (bill.status === "draft" ? bill.party : bill.partySnapshot) || {};
-  const halfRate = 9; // CGST 9% + SGST 9%
+  const extraGst = bill.gstMode === "exclusive";
+  const fee = (l) => (extraGst ? l.net : l.total); // MCC's fee already includes GST
+  const rates = [...new Set(bill.lines.map((l) => (l.lumpsum ? "lumpsum" : l.servicePercent)))];
+  const rate = rates.length === 1 && rates[0] != null && rates[0] !== "lumpsum" ? `${Number(rates[0]).toFixed(2)}%` : "";
+  const sum = (f) => bill.lines.reduce((a, l) => a + (f(l) || 0), 0);
+  const ref = refs(bill.lines);
+  const cell = "border border-black px-2 py-1.5";
+  const money = (paise) => (
+    <span className="flex justify-between gap-3 tabular-nums">
+      <span>ರೂ</span>
+      <span>{plain(paise)}</span>
+    </span>
+  );
   return (
     <article className="cc-card bg-white p-6 text-[13px] leading-relaxed text-black print:border-0 print:p-0 print:shadow-none sm:p-10">
-      <header className="flex flex-wrap items-start justify-between gap-4 border-b-2 border-cc-primary pb-4">
-        <div className="flex items-start gap-3">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-cc-sidebar text-base font-extrabold text-cc-accent print:border print:border-black">CC</span>
-          <div>
-            <p className="text-lg font-bold">{s.orgName}</p>
-            <p>{s.orgSubtitle}</p>
-            <p className="whitespace-pre-line text-xs">{s.address}</p>
-            <p className="text-xs">
-              {[s.phone && `Ph: ${s.phone}`, s.email].filter(Boolean).join(" · ")}
-            </p>
-          </div>
-        </div>
-        <div className="text-right text-xs">
-          <p className="text-base font-bold tracking-wide text-cc-primary print:text-black">{s.gstin ? "TAX INVOICE" : "BILL"}</p>
-          {s.gstin && <p>GSTIN: {s.gstin}</p>}
-          {s.pan && <p>PAN: {s.pan}</p>}
-          {s.sacCode && <p>SAC: {s.sacCode}</p>}
-        </div>
+      <header className="border-b-2 border-black pb-1 text-center">
+        <p className="text-[15px] font-bold">{s.orgName}</p>
+        {s.orgSubtitle && <p className="font-bold">{s.orgSubtitle}</p>}
+        <p className="whitespace-pre-line font-bold">{s.address}</p>
+        <p className="mt-0.5 flex flex-wrap justify-between gap-x-6 text-[12px] font-bold">
+          <span>{[s.email && `Email : ${s.email}`, s.phone && `Ph: ${s.phone}`].filter(Boolean).join(" · ")}</span>
+          {s.gstin && <span>C.G.S.T. / S.G.S.T. No.{s.gstin}</span>}
+        </p>
       </header>
 
-      <section className="mt-4 grid gap-4 sm:grid-cols-2">
-        <div>
-          <p className="text-xs font-semibold uppercase text-gray-500">Bill to</p>
-          <p className="font-semibold">{p.name}</p>
-          <p className="whitespace-pre-line">{p.billingAddress || <span className="no-print text-cc-bad">Address not set (Bill settings → Parties)</span>}</p>
-          {p.gstin && <p>GSTIN: {p.gstin}</p>}
-        </div>
-        <div className="sm:text-right">
-          <p>
-            <span className="text-gray-500">Bill no.: </span>
-            <b>{bill.number || "DRAFT"}</b>
-          </p>
-          <p>
-            <span className="text-gray-500">Date: </span>
-            {fmtDate(bill.billDate)}
-          </p>
-        </div>
-      </section>
+      <div className="mt-4 flex flex-wrap justify-between gap-2">
+        <p className="break-all">{bill.number || "DRAFT (number given on issue)"}</p>
+        <p className="whitespace-nowrap">ದಿನಾಂಕ: {dmy(bill.billDate)}</p>
+      </div>
 
-      <p className="mt-4">
-        <span className="text-gray-500">Subject: </span>
-        {bill.subject}
-      </p>
-      {refs(bill.lines) && (
-        <p>
-          <span className="text-gray-500">Ref. · ಉಲ್ಲೇಖ: </span>
-          {refs(bill.lines)}
-        </p>
-      )}
-      {bill.fundName && (
-        <p>
-          <span className="text-gray-500">Fund · ಅನುದಾನ: </span>
-          {bill.fundName}
-        </p>
-      )}
+      <div className="mt-3">
+        <p>ರಿಗೆ,</p>
+        <p className="whitespace-pre-line">{p.billingAddress || p.name}</p>
+        {!p.billingAddress && <p className="no-print text-xs text-cc-bad">Address not set (Bill settings → Parties)</p>}
+        {p.gstin && <p>GSTIN: {p.gstin}</p>}
+      </div>
+      <p className="mt-3">ಮಾನ್ಯರೇ,</p>
+
+      <p className="mt-3 text-center font-semibold underline underline-offset-4">3ನೇ ಪಾರ್ಟಿ ತಪಾಸಣಾ ಬಿಲ್ಲು</p>
+      {ref && <p className="mt-1 text-center">ಉಲ್ಲೇಖ:- ತಮ್ಮ ಪತ್ರ ಸಂಖ್ಯೆ {ref}</p>}
+      {bill.fundName && <p className="no-print mt-1 text-center text-xs text-gray-500">ಅನುದಾನ: {bill.fundName}</p>}
 
       <div className="mt-3 overflow-x-auto">
         <table className="w-full min-w-[600px] border-collapse text-[12px]">
           <thead>
-            <tr className="bg-cc-primary-soft text-left print:bg-gray-100">
-              <th className="border border-gray-300 px-2 py-1.5">Sl.</th>
-              <th className="border border-gray-300 px-2 py-1.5">Application</th>
-              <th className="border border-gray-300 px-2 py-1.5">Work / Contractor</th>
-              <th className="border border-gray-300 px-2 py-1.5 text-right">Estimate (₹)</th>
-              <th className="border border-gray-300 px-2 py-1.5 text-right">Work bill (₹)</th>
-              <th className="border border-gray-300 px-2 py-1.5 text-right">Rate</th>
-              <th className="border border-gray-300 px-2 py-1.5 text-right">Fee (₹)</th>
+            <tr className="align-bottom font-bold">
+              <th className={`${cell} w-12 text-left`}>ಕ್ರ.ಸಂ.</th>
+              <th className={`${cell} text-center`}>ಕಾಮಗಾರಿಯ ಹೆಸರು</th>
+              <th className={`${cell} w-36 text-center`}>ಅಂದಾಜು ಪಟ್ಟಿ ಮೊತ್ತ</th>
+              <th className={`${cell} w-36 text-center`}>ಬಿಲ್ಲಿನ ಮೊತ್ತ</th>
+              <th className={`${cell} w-32 text-center`}>
+                ತಪಾಸಣಾ ಶುಲ್ಕ
+                {rate && <span className="block">{rate}</span>}
+              </th>
             </tr>
           </thead>
           <tbody>
             {bill.lines.map((l, i) => (
               <tr key={String(l.project)} className="align-top">
-                <td className="border border-gray-300 px-2 py-1.5">{i + 1}</td>
-                <td className="border border-gray-300 px-2 py-1.5 whitespace-nowrap">
-                  {l.appNo}
-                  <span className="block text-gray-500">{fmtDate(l.appDate)}</span>
-                  {l.certificateNo && <span className="block text-gray-500">Report {l.certificateNo}</span>}
-                </td>
-                <td className="border border-gray-300 px-2 py-1.5">
+                <td className={cell}>{i + 1}</td>
+                <td className={cell}>
                   {l.description || "Third party inspection"}
-                  <span className="block text-gray-500">
-                    {[l.ward && `Ward ${l.ward}`, l.fileNo && `File ${l.fileNo}${l.workYear ? `/${l.workYear}` : ""}`, l.contractorName].filter(Boolean).join(" · ")}
+                  {l.fileNo && <span className="mt-3 block">ಅ.ಪ.ಸಂ.{l.fileNo}{l.workYear ? `/${l.workYear}` : ""}</span>}
+                  <span className="no-print block text-xs text-gray-500">
+                    App {l.appNo}
+                    {l.lumpsum ? " · lumpsum fee" : !rate && l.servicePercent != null ? ` · ${l.servicePercent}%` : ""}
                   </span>
                 </td>
-                <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">{l.estimateAmount != null ? plain(l.estimateAmount) : "—"}</td>
-                <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">{plain(l.projectBillAmount)}</td>
-                <td className="border border-gray-300 px-2 py-1.5 text-right">{l.lumpsum ? "Lumpsum" : `${l.servicePercent}%`}</td>
-                <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">{plain(l.net)}</td>
+                <td className={`${cell} align-middle`}>{l.estimateAmount != null ? money(l.estimateAmount) : ""}</td>
+                <td className={`${cell} align-middle`}>{money(l.projectBillAmount)}</td>
+                <td className={`${cell} align-middle`}>{money(fee(l))}</td>
               </tr>
             ))}
           </tbody>
-          <tfoot className="font-semibold">
+          <tfoot className="font-bold">
             <tr>
-              <td colSpan={6} className="border border-gray-300 px-2 py-1.5 text-right">Taxable value</td>
-              <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">{plain(bill.totals.net)}</td>
+              <td className={cell} />
+              <td className={`${cell} text-center`}>ಒಟ್ಟು</td>
+              <td className={cell}>{sum((l) => l.estimateAmount) ? money(sum((l) => l.estimateAmount)) : ""}</td>
+              <td className={cell}>{money(sum((l) => l.projectBillAmount))}</td>
+              <td className={cell}>{money(extraGst ? bill.totals.net : bill.totals.total)}</td>
             </tr>
-            <tr>
-              <td colSpan={6} className="border border-gray-300 px-2 py-1.5 text-right">CGST @ {halfRate}%</td>
-              <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">{plain(bill.totals.cgst)}</td>
-            </tr>
-            <tr>
-              <td colSpan={6} className="border border-gray-300 px-2 py-1.5 text-right">SGST @ {halfRate}%</td>
-              <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">{plain(bill.totals.sgst)}</td>
-            </tr>
-            <tr className="bg-cc-primary-soft text-[13px] print:bg-gray-100">
-              <td colSpan={6} className="border border-gray-300 px-2 py-2 text-right">Total payable</td>
-              <td className="border border-gray-300 px-2 py-2 text-right tabular-nums">{plain(bill.totals.total)}</td>
-            </tr>
+            {extraGst && (
+              <>
+                <tr>
+                  <td colSpan={4} className={`${cell} text-right`}>CGST @ 9%</td>
+                  <td className={cell}>{money(bill.totals.cgst)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={4} className={`${cell} text-right`}>SGST @ 9%</td>
+                  <td className={cell}>{money(bill.totals.sgst)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={4} className={`${cell} text-right`}>ಒಟ್ಟು ಪಾವತಿಸಬೇಕಾದ ಮೊತ್ತ</td>
+                  <td className={cell}>{money(bill.totals.total)}</td>
+                </tr>
+              </>
+            )}
           </tfoot>
         </table>
       </div>
-      <p className="mt-2 font-semibold">{amountInWords(bill.totals.total)}</p>
-      {bill.gstMode === "inclusive" && <p className="text-xs text-gray-500">Fee as per the agreed rate, inclusive of GST.</p>}
+      <p className="mt-3">({amountInKannada(bill.totals.total)})</p>
       {bill.remarks && <p className="mt-2">{bill.remarks}</p>}
 
-      <footer className="mt-8 grid gap-6 sm:grid-cols-2">
+      <footer className="mt-10 flex flex-wrap items-end justify-between gap-6">
         <div className="text-xs">
           {(s.bankName || s.accountNo) && (
             <>
-              <p className="font-semibold uppercase text-gray-500">Payment to</p>
+              <p className="font-semibold">Payment to</p>
               {s.accountName && <p>A/c name: {s.accountName}</p>}
               {s.accountNo && <p>A/c no.: {s.accountNo}</p>}
               {s.bankName && <p>Bank: {s.bankName}{s.bankBranch ? `, ${s.bankBranch}` : ""}</p>}
               {s.ifsc && <p>IFSC: {s.ifsc}</p>}
+              {s.billNote && <p className="mt-1 text-gray-600">{s.billNote}</p>}
             </>
           )}
-          {s.billNote && <p className="mt-2 text-gray-600">{s.billNote}</p>}
         </div>
-        <div className="flex flex-col items-end justify-end">
-          <div className="h-14" />
-          <p className="border-t border-gray-400 px-6 pt-1 text-center font-semibold">{s.billSignatory}</p>
-          <p className="text-xs">{s.orgName}</p>
+        <div className="ml-auto text-center">
+          <div className="h-12" />
+          <p className="uppercase">{s.billSignatory}</p>
         </div>
       </footer>
     </article>
@@ -357,9 +345,12 @@ function BillDocument({ bill, settings }) {
 
 const plain = (paise) => (Number(paise || 0) / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// "Your letter no. X dt. Y" for each application that has one
+// 14.10.2026, in Indian time
+const dmy = (d) => (d ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Kolkata" }).replace(/\//g, ".") : "");
+
+// The party's letter(s): "ಮ.ನ.ಪಾ./ಕಾ.ಅ.ವಿಭಾಗ-2/3ನೇ ಪಾರ್ಟಿ ತಪಾಸಣೆ/2024-25 ದಿ:16.09.2026"
 const refs = (lines) =>
-  [...new Set(lines.filter((l) => l.letterRefNo).map((l) => `${l.letterRefNo}${l.letterDate ? ` dt. ${fmtDate(l.letterDate)}` : ""}`))].join("; ");
+  [...new Set(lines.filter((l) => l.letterRefNo).map((l) => `${l.letterRefNo}${l.letterDate ? ` ದಿ:${dmy(l.letterDate)}` : ""}`))].join("; ");
 
 // ---------------------------------------------------------------- dialogs
 

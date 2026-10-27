@@ -6,11 +6,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CheckCircle2, ArrowRight, FileWarning, Clock3, FilePlus2, BadgeCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ArrowRight, FileWarning, Clock3, FilePlus2, BadgeCheck, Layers } from "lucide-react";
 import { formatRupees } from "@/lib/api";
 import { useMe } from "@/lib/useMe";
 import { useFetch, fyOptions, fyOf, monthLabel, rupeesShort } from "@/lib/billing";
 import DataTable from "@/app/components/table/DataTable";
+import { useFunds, fundOptions } from "@/app/components/projects/useProjectList";
 import ProjectDrawer from "@/app/components/projects/ProjectDrawer";
 import { StatusBadge, fmtDate } from "@/app/components/projects/projectMeta";
 import Avatar from "@/app/components/users/Avatar";
@@ -48,6 +49,8 @@ export default function ManagerDeskPage() {
       ) : (
         <>
           <Attention d={d} onGo={(href) => router.push(href)} />
+
+          <FundMoney rows={d.byFund} onGo={(href) => router.push(href)} />
 
           <Card title="Work stages" kn="ಕೆಲಸದ ಹಂತಗಳು" bodyClass="p-4">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -226,6 +229,94 @@ function Attention({ d, onGo }) {
         ))}
       </div>
     </section>
+  );
+}
+
+// Money waiting, per party and fund. All bills of one fund go on one Statement
+// of Bills and are paid with one cheque, so each row is one cheque to chase.
+function FundMoney({ rows = [], onGo }) {
+  const { funds } = useFunds();
+  const [fund, setFund] = useState("");
+  const shown = rows.filter((r) => !fund || (fund === "none" ? !r.fund : String(r.fund) === fund));
+  const total = shown.reduce((a, r) => a + r.due, 0);
+  const q = (r) => `party=${r.partyId}&fund=${r.fund || "none"}`;
+  return (
+    <Card
+      title="Money waiting, by fund"
+      kn="ಅನುದಾನವಾರು ಬಾಕಿ · ಒಂದು ಅನುದಾನಕ್ಕೆ ಒಂದು ಚೆಕ್"
+      bodyClass="overflow-x-auto"
+      actions={
+        <label className="flex items-center gap-2 text-xs">
+          <span className="font-semibold text-cc-muted">Fund · ಅನುದಾನ</span>
+          <select value={fund} onChange={(e) => setFund(e.target.value)} className="cc-field px-3 py-1.5 text-sm font-semibold">
+            <option value="">All funds</option>
+            {fundOptions(funds).map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </label>
+      }
+    >
+      {shown.length === 0 ? (
+        <Empty>{fund ? "Nothing waiting under this fund." : "No unpaid bills and nothing waiting to be billed."}</Empty>
+      ) : (
+        <table className="w-full min-w-[760px] text-sm">
+          <thead className="bg-cc-subtle text-left text-xs text-cc-muted">
+            <tr>
+              <th className="px-4 py-2">Party · fund</th>
+              <th className="px-4 py-2 text-right">Reports to bill</th>
+              <th className="px-4 py-2 text-right">Unpaid bills</th>
+              <th className="px-4 py-2 text-right">Due</th>
+              <th className="px-4 py-2 text-right">Oldest</th>
+              <th className="px-4 py-2">Statement of bills</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((r) => (
+              <tr key={r.key} className="cc-press cursor-pointer border-t border-cc-border align-top hover:bg-cc-subtle" onClick={() => onGo(r.bills ? `/billing/bills?${q(r)}` : `/billing?${q(r)}`)}>
+                <td className="px-4 py-2">
+                  <span className="font-semibold">{r.fundName || "No fund"}</span>
+                  <span className="block text-xs text-cc-muted">{r.party}</span>
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums">
+                  {r.toBill ? (
+                    <>
+                      {r.toBill}
+                      <span className="block text-xs text-cc-muted">{formatRupees(r.toBillAmount)}</span>
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums">{r.bills || "—"}</td>
+                <td className="px-4 py-2 text-right font-semibold tabular-nums">{r.due ? formatRupees(r.due) : "—"}</td>
+                <td className={`px-4 py-2 text-right tabular-nums ${r.days > 60 ? "font-bold text-cc-bad" : r.days > 30 ? "font-bold text-cc-warn" : "text-cc-muted"}`}>{r.bills ? `${r.days} d` : "—"}</td>
+                <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
+                  {r.statements.map((s) => (
+                    <Link key={s._id} href={`/billing/groups/${s._id}`} className="block text-xs font-semibold text-cc-primary hover:underline">
+                      {s.number}
+                    </Link>
+                  ))}
+                  {r.loose > 0 && (
+                    <button type="button" onClick={() => onGo(`/billing/groups?new=1&${q(r)}`)} className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-cc-primary hover:underline">
+                      <Layers size={13} aria-hidden /> Make statement ({r.loose} bill{r.loose > 1 ? "s" : ""}, {formatRupees(r.looseDue)})
+                    </button>
+                  )}
+                  {!r.statements.length && !r.loose && <span className="text-xs text-cc-muted">—</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot className="border-t-2 border-cc-border font-bold">
+            <tr>
+              <td className="px-4 py-2" colSpan={3}>Total due{fund ? " (this fund)" : ""}</td>
+              <td className="px-4 py-2 text-right tabular-nums">{formatRupees(total)}</td>
+              <td colSpan={2} />
+            </tr>
+          </tfoot>
+        </table>
+      )}
+    </Card>
   );
 }
 

@@ -47,7 +47,7 @@ const lineSchema = new mongoose.Schema(
 
 const billSchema = new mongoose.Schema(
   {
-    number: { type: String, default: null }, // set on issue: ಸಂ.ಕೆಪಿಎಂ/ಸಿಸಿಟೆಕ್/ಟಿ.ಪಿ.ಐ.ಆರ್/2026-27/12.04.2026/1459
+    number: { type: String, default: null }, // set on issue: ಸಂ.ಕೆಪಿಎಂ/ಸಿಸಿಟೆಕ್/3ನೇ ಪಾರ್ಟಿ ತಪಾಸಣೆ/2026-27/895
     financialYear: { type: String, default: null },
     seq: { type: Number, default: null }, // the running number at the end
     status: { type: String, enum: BILL_STATUSES, default: "draft", index: true },

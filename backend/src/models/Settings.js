@@ -26,8 +26,8 @@ const settingsSchema = new mongoose.Schema(
       maxlength: 500,
     },
     billSignatory: { type: String, trim: true, default: "CCTEK Manager", maxlength: 80 },
-    // bill no. = prefix / year / bill date / running no.
-    billPrefix: { type: String, trim: true, default: "ಸಂ.ಕೆಪಿಎಂ/ಸಿಸಿಟೆಕ್/ಟಿ.ಪಿ.ಐ.ಆರ್", maxlength: 80 },
+    // bill no. = prefix / year / running no., e.g. ಸಂ.ಕೆಪಿಎಂ/ಸಿಸಿಟೆಕ್/3ನೇ ಪಾರ್ಟಿ ತಪಾಸಣೆ/2026-27/895
+    billPrefix: { type: String, trim: true, default: "ಸಂ.ಕೆಪಿಎಂ/ಸಿಸಿಟೆಕ್/3ನೇ ಪಾರ್ಟಿ ತಪಾಸಣೆ", maxlength: 80 },
     groupSignatory: { type: String, trim: true, default: "Principal", maxlength: 80 }, // Statement of Bills
     statementSignatories: { type: [String], default: ["Prepared by", "CCTEK Manager", "Principal"] },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
@@ -37,8 +37,15 @@ const settingsSchema = new mongoose.Schema(
 
 const Settings = mongoose.models.Settings || mongoose.model("Settings", settingsSchema);
 
+// Defaults first, so fields added later (bill prefix...) have a value even in
+// a record saved before they existed.
 export async function getSettings() {
-  return (await Settings.findById("cctek").lean()) || new Settings().toObject();
+  const saved = await Settings.findById("cctek").lean();
+  const defaults = new Settings().toObject();
+  if (!saved) return defaults;
+  const present = Object.fromEntries(Object.entries(saved).filter(([, v]) => v !== undefined && v !== null));
+  // a bill number always needs its prefix
+  return { ...defaults, ...present, billPrefix: saved.billPrefix || defaults.billPrefix };
 }
 
 export default Settings;

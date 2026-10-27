@@ -248,13 +248,9 @@ export const createBill = async (req, res) => {
   res.status(201).json({ success: true, data: bills[0], bills: bills.map((x) => ({ _id: x._id })) });
 };
 
-// Bill number as on the paper bills: prefix / year / bill date / running no.
-const ist = (d) => new Date(new Date(d).getTime() + 330 * 60_000); // dates print in Indian time
-const ddmmyyyy = (d) => {
-  const x = ist(d);
-  return `${pad(x.getUTCDate(), 2)}.${pad(x.getUTCMonth() + 1, 2)}.${x.getUTCFullYear()}`;
-};
-const billNumber = (prefix, fy, billDate, seq) => `${prefix || "CCTEK"}/${fy}/${ddmmyyyy(billDate)}/${seq}`;
+// Bill number as on the paper bills: prefix / year / running no.
+// (ಸಂ.ಕೆಪಿಎಂ/ಸಿಸಿಟೆಕ್/3ನೇ ಪಾರ್ಟಿ ತಪಾಸಣೆ/2026-27/895). The date is printed beside it.
+const billNumber = (prefix, fy, seq) => `${prefix}/${fy}/${seq}`;
 
 // What the next bill would be numbered (shown in the Issue dialog).
 export const nextBillNumber = async (req, res) => {
@@ -262,7 +258,7 @@ export const nextBillNumber = async (req, res) => {
   const fy = financialYear(billDate);
   const [counter, settings] = await Promise.all([Counter.findById(`bill:${fy}`).lean(), getSettings()]);
   const seq = (counter?.seq || 0) + 1;
-  res.json({ success: true, data: { financialYear: fy, seq, number: billNumber(settings.billPrefix, fy, billDate, seq) } });
+  res.json({ success: true, data: { financialYear: fy, seq, number: billNumber(settings.billPrefix, fy, seq) } });
 };
 
 // Give the draft its number and send it.
@@ -296,7 +292,7 @@ export const issueBill = async (req, res) => {
       billDate,
       financialYear: fy,
       seq,
-      number: billNumber(settings.billPrefix, fy, billDate, seq),
+      number: billNumber(settings.billPrefix, fy, seq),
       partySnapshot: { code: party.code, name: party.name, billingAddress: party.billingAddress, gstin: party.gstin },
       issuedBy: req.user.dbId,
       issuedAt: new Date(),

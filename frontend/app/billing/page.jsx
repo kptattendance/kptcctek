@@ -4,8 +4,8 @@
 // Tick the jobs of one party -> "Create bill" makes draft bills to check and
 // issue: one bill per application (usual), or one bill for all of them.
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FilePlus2 } from "lucide-react";
 import { useApi, formatRupees } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
@@ -14,14 +14,23 @@ import DataTable, { FilterBar, FilterSearch, FilterSelect } from "@/app/componen
 import { useParties, useFunds, fundOptions } from "@/app/components/projects/useProjectList";
 import { fmtDate, daysSince, ageClass, isoToday } from "@/app/components/projects/projectMeta";
 import { Modal } from "@/app/components/projects/dialogs";
-import { PageHeader, Field, Button, inputCls } from "@/app/components/ui";
+import { PageHeader, Field, Button, inputCls, Spinner } from "@/app/components/ui";
 
 export default function ReadyToBillPage() {
+  return (
+    <Suspense fallback={<Spinner />}>
+      <ReadyToBill />
+    </Suspense>
+  );
+}
+
+function ReadyToBill() {
   const api = useApi();
   const router = useRouter();
+  const search = useSearchParams(); // the Manager desk links here with ?party=..&fund=..
   const parties = useParties();
   const { funds } = useFunds();
-  const [filters, setFilters] = useState({ party: "", fund: "", q: "" });
+  const [filters, setFilters] = useState(() => ({ party: search.get("party") || "", fund: search.get("fund") || "", q: "" }));
   const { data, loading, reload } = useFetch("/billing/ready", filters);
   const rows = useMemo(() => data || [], [data]);
   const [picked, setPicked] = useState(() => new Set());

@@ -34,9 +34,11 @@ function BillsList() {
   const router = useRouter();
   const parties = useParties();
   const { funds } = useFunds();
-  const wantedTab = useSearchParams().get("tab");
+  const search = useSearchParams();
+  const wantedTab = search.get("tab");
   const [tab, setTab] = useState(TABS.some((t) => t.key === wantedTab) ? wantedTab : "open");
-  const [filters, setFilters] = useState({});
+  // the Manager desk links here with ?party=..&fund=..
+  const [filters, setFilters] = useState(() => Object.fromEntries(["party", "fund"].map((k) => [k, search.get(k) || ""]).filter(([, v]) => v)));
   const [page, setPage] = useState(1);
   const setFilter = (k, v) => {
     setFilters((f) => ({ ...f, [k]: v }));

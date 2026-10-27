@@ -4,8 +4,8 @@
 // together so the party pays them with one cheque. "New statement" picks the
 // party and fund, then the unpaid bills to put on it.
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Layers } from "lucide-react";
 import { useApi, formatRupees } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
@@ -25,14 +25,24 @@ const TABS = [
 ];
 
 export default function GroupsPage() {
+  return (
+    <Suspense fallback={<Spinner />}>
+      <GroupsList />
+    </Suspense>
+  );
+}
+
+function GroupsList() {
   const router = useRouter();
+  const search = useSearchParams();
   const { me } = useMe();
   const parties = useParties();
   const { funds } = useFunds();
   const [tab, setTab] = useState("open");
   const [filters, setFilters] = useState({});
   const [page, setPage] = useState(1);
-  const [creating, setCreating] = useState(false);
+  // the Manager desk's "Make statement" opens the dialog for its party + fund
+  const [creating, setCreating] = useState(() => (search.get("new") ? { party: search.get("party") || "", fund: search.get("fund") || "" } : null));
   const setFilter = (k, v) => {
     setFilters((f) => ({ ...f, [k]: v }));
     setPage(1);
@@ -56,7 +66,7 @@ export default function GroupsPage() {
     <div className="mx-auto max-w-[1400px] space-y-5">
       <PageHeader title="Statements of Bills" kn="ಬಿಲ್ಲುಗಳ ಪಟ್ಟಿ" sub="Bills of one party under one fund, paid with one cheque. The cheque is entered on every bill in it.">
         {can(me, "billing.prepare") && (
-          <Button primary onClick={() => setCreating(true)}>
+          <Button primary onClick={() => setCreating({})}>
             <Layers size={16} aria-hidden /> New statement
           </Button>
         )}
@@ -85,15 +95,17 @@ export default function GroupsPage() {
         onPage={setPage}
         emptyText="No statements here."
       />
-      {creating && <NewGroupDialog parties={parties} funds={funds} onClose={() => setCreating(false)} onCreated={(id) => router.push(`/billing/groups/${id}`)} />}
+      {creating && can(me, "billing.prepare") && (
+        <NewGroupDialog parties={parties} funds={funds} preset={creating} onClose={() => setCreating(null)} onCreated={(id) => router.push(`/billing/groups/${id}`)} />
+      )}
     </div>
   );
 }
 
-function NewGroupDialog({ parties, funds, onClose, onCreated }) {
+function NewGroupDialog({ parties, funds, preset = {}, onClose, onCreated }) {
   const api = useApi();
-  const [party, setParty] = useState(() => parties.find((p) => p.code === "MCC")?._id || "");
-  const [fund, setFund] = useState(""); // fund id, or "none"
+  const [party, setParty] = useState(() => preset.party || parties.find((p) => p.code === "MCC")?._id || "");
+  const [fund, setFund] = useState(preset.fund || ""); // fund id, or "none"
   const [picked, setPicked] = useState(() => new Set());
   const [when, setWhen] = useState(isoToday());
   const [remarks, setRemarks] = useState("");

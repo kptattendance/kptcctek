@@ -29,7 +29,7 @@ const FIELDS = [
   ["ifsc", "IFSC", "ಐಎಫ್‌ಎಸ್‌ಸಿ"],
   ["billSignatory", "Bill signed by", "ಸಹಿ"],
   ["groupSignatory", "Statement of Bills signed by", "ಪಟ್ಟಿಗೆ ಸಹಿ"],
-  ["billPrefix", "Bill no. starts with", "ಬಿಲ್ ಸಂಖ್ಯೆ ಆರಂಭ", "wide", "Bill no. = this / year / bill date / running no., e.g. ಸಂ.ಕೆಪಿಎಂ/ಸಿಸಿಟೆಕ್/ಟಿ.ಪಿ.ಐ.ಆರ್/2026-27/12.04.2026/1459"],
+  ["billPrefix", "Bill no. starts with", "ಬಿಲ್ ಸಂಖ್ಯೆ ಆರಂಭ", "wide", "Bill no. = this / year / running no., e.g. ಸಂ.ಕೆಪಿಎಂ/ಸಿಸಿಟೆಕ್/3ನೇ ಪಾರ್ಟಿ ತಪಾಸಣೆ/2026-27/895"],
   ["billNote", "Note printed on the bill", "ಟಿಪ್ಪಣಿ", "textarea"],
 ];
 

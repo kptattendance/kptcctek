@@ -146,7 +146,7 @@ export const managerDesk = async (req, res) => {
   const thisMonth = monthStart(0);
   const lastMonth = monthStart(-1);
 
-  const [open, toApprove, drafts, overdueBills, monthly, team, earnings, activity, yearCounts] = await Promise.all([
+  const [open, toApprove, drafts, overdueBills, monthly, team, earnings, activity, yearCounts, funds] = await Promise.all([
     Project.find({ status: t({ $in: Object.keys(DELAY_RULES) }) })
       .select("appNo appDate party ward contractorName status plannedInspectionDate inspectionDate report.issuedOn bill team createdAt statusHistory")
       .slice("statusHistory", -1)
@@ -185,6 +185,7 @@ export const managerDesk = async (req, res) => {
     ]),
     recentActivity(15),
     Project.aggregate([{ $match: { financialYear: fy } }, { $group: { _id: "$status", n: { $sum: 1 } } }]),
+    byFund(),
   ]);
 
   // delayed work, worst first
@@ -230,10 +231,53 @@ export const managerDesk = async (req, res) => {
       months: monthly,
       team: team.map((m) => ({ ...m, earned: earned.get(String(m.user)) || 0 })),
       year: { applications: Object.values(counts).reduce((a, b) => a + b, 0), counts, since: fyStart },
+      byFund: funds,
       activity,
     },
   });
 };
+
+// Money waiting per party and fund. The party pays one cheque per fund, so
+// each row is one Statement of Bills to make (or already made) and chase.
+async function byFund() {
+  const [bills, ready] = await Promise.all([
+    Bill.find({ status: t({ $in: ["issued", "part_paid"] }) })
+      .select("party fund fundName group billDate totals settled")
+      .populate("party", "code")
+      .populate("group", "number status")
+      .lean(),
+    Project.find({ status: "report_issued", bill: null }).select("party fund charges.net charges.gst").populate("party", "code").populate("fund", "name").lean(),
+  ]);
+  const rows = new Map();
+  const row = (party, fund, fundName) => {
+    const key = `${party?._id}|${fund || ""}`;
+    if (!rows.has(key))
+      rows.set(key, { key, party: party?.code, partyId: party?._id, fund: fund || null, fundName: fundName || "", toBill: 0, toBillAmount: 0, bills: 0, due: 0, loose: 0, looseDue: 0, oldest: null, statements: new Map() });
+    return rows.get(key);
+  };
+  for (const p of ready) {
+    const r = row(p.party, p.fund?._id, p.fund?.name);
+    r.toBill += 1;
+    r.toBillAmount += (p.charges?.net || 0) + (p.charges?.gst || 0);
+  }
+  for (const b of bills) {
+    const r = row(b.party, b.fund, b.fundName);
+    if (!r.fundName && b.fundName) r.fundName = b.fundName;
+    const due = b.totals.total - b.settled.total;
+    r.bills += 1;
+    r.due += due;
+    const g = b.group && b.group.status !== "cancelled" ? b.group : null;
+    if (g) r.statements.set(String(g._id), { _id: g._id, number: g.number });
+    else {
+      r.loose += 1; // not on a statement yet
+      r.looseDue += due;
+    }
+    if (!r.oldest || b.billDate < r.oldest) r.oldest = b.billDate;
+  }
+  return [...rows.values()]
+    .map((r) => ({ ...r, statements: [...r.statements.values()], days: r.oldest ? daysSince(r.oldest) : 0 }))
+    .sort((a, b) => b.due - a.due || b.toBill - a.toBill);
+}
 
 // New work, inspections, reports, bills and money for last month and this month.
 async function monthlyCounts(lastMonth, thisMonth) {

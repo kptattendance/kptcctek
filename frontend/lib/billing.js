@@ -114,6 +114,47 @@ export function amountInWords(paise) {
   return `${rupees}${p ? ` and ${twoDigits(p)} Paise` : ""} Only`;
 }
 
+// 2947 -> "ಒಟ್ಟು ರೂಪಾಯಿ ಎರಡು ಸಾವಿರದ ಒಂಭೈನೂರ ನಲವತ್ತೇಳು ಮಾತ್ರ", as on the paper
+// bills (their spelling: ಒಂಭತ್ತು, ಒಂಭೈನೂರ).
+const KN_ONES = ["", "ಒಂದು", "ಎರಡು", "ಮೂರು", "ನಾಲ್ಕು", "ಐದು", "ಆರು", "ಏಳು", "ಎಂಟು", "ಒಂಭತ್ತು", "ಹತ್ತು", "ಹನ್ನೊಂದು", "ಹನ್ನೆರಡು", "ಹದಿಮೂರು", "ಹದಿನಾಲ್ಕು", "ಹದಿನೈದು", "ಹದಿನಾರು", "ಹದಿನೇಳು", "ಹದಿನೆಂಟು", "ಹತ್ತೊಂಭತ್ತು"];
+const KN_TENS = ["", "", "ಇಪ್ಪತ್ತು", "ಮೂವತ್ತು", "ನಲವತ್ತು", "ಐವತ್ತು", "ಅರವತ್ತು", "ಎಪ್ಪತ್ತು", "ಎಂಬತ್ತು", "ತೊಂಭತ್ತು"];
+// a unit joined to the tens word without its last "ು": ಇಪ್ಪತ್ತ + ೊಂದು = ಇಪ್ಪತ್ತೊಂದು
+const KN_JOINED = ["", "ೊಂದು", "ೆರಡು", "ಮೂರು", "ನಾಲ್ಕು", "ೈದು", "ಾರು", "ೇಳು", "ೆಂಟು", "ೊಂಭತ್ತು"];
+const KN_HUNDREDS = ["", "ನೂರು", "ಇನ್ನೂರು", "ಮುನ್ನೂರು", "ನಾನೂರು", "ಐನೂರು", "ಆರುನೂರು", "ಏಳುನೂರು", "ಎಂಟುನೂರು", "ಒಂಭೈನೂರು"];
+const dropU = (w) => w.slice(0, -1); // ನೂರು -> ನೂರ, ಇಪ್ಪತ್ತು -> ಇಪ್ಪತ್ತ
+
+function knBelow100(n) {
+  if (n < 20) return KN_ONES[n];
+  const t = KN_TENS[Math.floor(n / 10)];
+  return n % 10 ? dropU(t) + KN_JOINED[n % 10] : t;
+}
+function knBelow1000(n) {
+  const h = Math.floor(n / 100);
+  const r = n % 100;
+  return [h ? (r ? dropU(KN_HUNDREDS[h]) : KN_HUNDREDS[h]) : "", r ? knBelow100(r) : ""].filter(Boolean).join(" ");
+}
+
+export function amountInKannada(paise) {
+  const total = Math.round(Number(paise || 0));
+  let r = Math.floor(total / 100);
+  const p = total % 100;
+  const groups = [];
+  const crore = Math.floor(r / 1_00_00_000);
+  r %= 1_00_00_000;
+  const lakh = Math.floor(r / 1_00_000);
+  r %= 1_00_000;
+  const thousand = Math.floor(r / 1000);
+  r %= 1000;
+  // "ಸಾವಿರ" alone at the end, "ಸಾವಿರದ" when more follows
+  if (crore) groups.push([knBelow1000(crore), "ಕೋಟಿ", "ಕೋಟಿಯ"]);
+  if (lakh) groups.push([knBelow100(lakh), "ಲಕ್ಷ", "ಲಕ್ಷದ"]);
+  if (thousand) groups.push([knBelow100(thousand), "ಸಾವಿರ", "ಸಾವಿರದ"]);
+  const words = groups.map(([n, last, more], i) => `${n} ${i < groups.length - 1 || r ? more : last}`);
+  if (r) words.push(knBelow1000(r));
+  const rupees = words.length ? words.join(" ") : "ಸೊನ್ನೆ";
+  return `ಒಟ್ಟು ರೂಪಾಯಿ ${rupees}${p ? ` ಮತ್ತು ${knBelow100(p)} ಪೈಸೆ` : ""} ಮಾತ್ರ`;
+}
+
 // GET with loading state + reload(); errors become a popup.
 export function useFetch(url, params) {
   const api = useApi();
