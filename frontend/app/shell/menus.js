@@ -42,15 +42,6 @@ export const SECTIONS = [
     items: [{ href: "/coordinator", label: "Assign & track", kn: "ನಿಯೋಜನೆ ಮತ್ತು ಅನುಸರಣೆ", icon: "UsersRound" }],
   },
   {
-    title: "My work",
-    kn: "ನನ್ನ ಕೆಲಸ",
-    roles: ["faculty", "work_coordinator", "manager"],
-    items: [
-      { href: "/faculty", label: "My inspections", kn: "ನನ್ನ ತಪಾಸಣೆಗಳು", icon: "ClipboardCheck" },
-      { href: "/faculty/earnings", label: "My remuneration", kn: "ನನ್ನ ಸಂಭಾವನೆ", icon: "Wallet" },
-    ],
-  },
-  {
     title: "Billing",
     kn: "ಬಿಲ್ಲಿಂಗ್",
     roles: ["work_coordinator", "office_staff", "manager", "accounts", "approver", "auditor"],
